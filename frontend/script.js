@@ -221,16 +221,29 @@ function handleRobotResponse(data) {
         currentProximoBoleto = data.proximoBoleto;
         
         const btnProximo = document.getElementById('btnQueroPagarProximo');
-        if (currentProximoBoleto && currentProximoBoleto.linhaDigitavel) {
-            document.getElementById('textoEmDia').innerText += ` Caso queira, você consegue pagar o próximo boleto e garantir o nosso desconto de pontualidade.`;
+        if (currentProximoBoleto) {
+            document.getElementById('textoEmDia').innerText += ` Encontramos a sua próxima parcela para ${currentProximoBoleto.dataVencimento}.`;
             btnProximo.style.display = 'flex';
-            btnProximo.onclick = () => {
-                showLinhaDigitavel(
-                    currentProximoBoleto.linhaDigitavel, 
-                    currentProximoBoleto.numParcela, 
-                    currentProximoBoleto.dataVencimento
-                );
-            };
+            
+            if (currentProximoBoleto.linhaDigitavel) {
+                btnProximo.innerText = "PAGAR PRÓXIMO BOLETO";
+                btnProximo.style.opacity = '1';
+                btnProximo.style.cursor = 'pointer';
+                btnProximo.onclick = () => {
+                    showLinhaDigitavel(
+                        currentProximoBoleto.linhaDigitavel, 
+                        currentProximoBoleto.numParcela, 
+                        currentProximoBoleto.dataVencimento
+                    );
+                };
+            } else {
+                btnProximo.innerText = "BOLETO AINDA NÃO LIBERADO PELA ESCOLA";
+                btnProximo.style.opacity = '0.6';
+                btnProximo.style.cursor = 'not-allowed';
+                btnProximo.onclick = () => {
+                    alert("A linha digitável deste boleto ainda não foi liberada pelo sistema da Sponte. Tente novamente mais próximo ao vencimento.");
+                };
+            }
         } else {
             btnProximo.style.display = 'none'; // Se não tiver próximos boletos
         }
