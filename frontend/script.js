@@ -171,7 +171,8 @@ async function handleFormSubmit(e) {
         closeModal('modalLoading');
         cleanupGame();
         
-        // Se falhar por timeout ou erro do servidor, mostra o modal de tentar novamente
+        // Se falhar por timeout ou erro do servidor, mostra o modal de tentar novamente com mensagem genérica
+        document.getElementById('textoTimeout').innerText = "Desculpe! O sistema está com uma alta demanda ou demorando muito para responder no momento. Por favor, tente novamente!";
         openModal('modalTimeout');
     }
 }
@@ -203,6 +204,7 @@ function handleRobotResponse(data) {
         } else if (data.message && (data.message.toLowerCase().includes('encontrado') || data.message.toLowerCase().includes('existe'))) {
             openModal('modalCpfNaoEncontrado');
         } else if (data.message && data.message.toLowerCase().includes('falha ao acessar')) {
+            document.getElementById('textoTimeout').innerText = `Desculpe, ${nome}! O sistema está com uma alta demanda ou demorando muito para responder no momento. Por favor, tente novamente!`;
             openModal('modalTimeout');
         } else {
             alert("⚠️ Instabilidade no sistema Sponte. Tente novamente mais tarde: " + data.message);
