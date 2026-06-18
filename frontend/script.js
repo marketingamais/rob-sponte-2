@@ -129,7 +129,7 @@ async function handleFormSubmit(e) {
         
         let data = null;
         let tentativas = 0;
-        const maxTentativas = 3;
+        const maxTentativas = 5;
 
         while (tentativas < maxTentativas) {
             try {
@@ -171,8 +171,8 @@ async function handleFormSubmit(e) {
         closeModal('modalLoading');
         cleanupGame();
         
-        // Se falhar por timeout ou erro do servidor
-        alert("⚠️ O sistema da escola está demorando muito para responder no momento. Por favor, tente novamente em alguns instantes.");
+        // Se falhar por timeout ou erro do servidor, mostra o modal de tentar novamente
+        openModal('modalTimeout');
     }
 }
 
@@ -203,7 +203,7 @@ function handleRobotResponse(data) {
         } else if (data.message && (data.message.toLowerCase().includes('encontrado') || data.message.toLowerCase().includes('existe'))) {
             openModal('modalCpfNaoEncontrado');
         } else if (data.message && data.message.toLowerCase().includes('falha ao acessar')) {
-            alert("⚠️ O sistema da Sponte está muito lento. Por favor, tente novamente em alguns instantes.");
+            openModal('modalTimeout');
         } else {
             alert("⚠️ Instabilidade no sistema Sponte. Tente novamente mais tarde: " + data.message);
         }
