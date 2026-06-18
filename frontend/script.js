@@ -171,8 +171,8 @@ async function handleFormSubmit(e) {
         closeModal('modalLoading');
         cleanupGame();
         
-        // Mantemos um modal caso falhe completamente após as tentativas
-        openModal('modalCpfNaoEncontrado');
+        // Se falhar por timeout ou erro do servidor
+        alert("⚠️ O sistema da escola está demorando muito para responder no momento. Por favor, tente novamente em alguns instantes.");
     }
 }
 
@@ -202,8 +202,10 @@ function handleRobotResponse(data) {
             openModal('modalSemSenha');
         } else if (data.message && (data.message.toLowerCase().includes('encontrado') || data.message.toLowerCase().includes('existe'))) {
             openModal('modalCpfNaoEncontrado');
+        } else if (data.message && data.message.toLowerCase().includes('falha ao acessar')) {
+            alert("⚠️ O sistema da Sponte está muito lento. Por favor, tente novamente em alguns instantes.");
         } else {
-            openModal('modalCpfNaoEncontrado'); // Fallback to not found for any other error to be safe
+            alert("⚠️ Instabilidade no sistema Sponte. Tente novamente mais tarde: " + data.message);
         }
     } else if (data.status === 'negociar') {
         document.getElementById('tituloNegociar').innerHTML = `Atenção, <strong>${nome}</strong>`;
