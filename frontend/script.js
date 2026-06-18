@@ -244,7 +244,8 @@ function handleRobotResponse(data) {
     } else {
         // Fallback de segurança caso a API retorne algo inesperado ou Error in workflow
         if (data.message && data.message.includes('Error in workflow')) {
-            alert("⚠️ O sistema demorou muito para responder ou está instável no momento. Por favor, tente consultar novamente em alguns instantes.");
+            document.getElementById('textoTimeout').innerText = "Desculpe! O sistema está com uma alta demanda ou demorando muito para responder no momento. Por favor, tente novamente!";
+            openModal('modalTimeout');
         } else {
             alert("⚠️ Erro desconhecido ao processar o retorno. Tente novamente mais tarde.");
         }
