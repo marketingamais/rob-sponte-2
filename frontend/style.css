@@ -851,3 +851,92 @@ body {
     50% { box-shadow: 0 0 20px var(--whatsapp); outline: 2px solid var(--whatsapp); }
     100% { box-shadow: 0 0 0px transparent; outline: 2px solid transparent; }
 }
+
+/* ===== Boletos separados por filho ===== */
+.screen-subtitle {
+    display: block;
+    font-size: 1rem;
+    font-weight: 500;
+    color: var(--text-muted);
+    margin-top: 0.5rem;
+}
+
+.aluno-bloco {
+    border: 1px solid var(--border);
+    border-radius: 16px;
+    padding: 1.25rem;
+    margin-bottom: 1rem;
+    text-align: left;
+    background: #fff;
+}
+
+.aluno-header {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    gap: 0.5rem;
+    margin-bottom: 1rem;
+}
+
+.aluno-nome {
+    display: flex;
+    align-items: center;
+    gap: 0.5rem;
+    font-weight: 700;
+    font-size: 1.05rem;
+    color: var(--text-main);
+}
+
+.aluno-badge {
+    font-size: 0.75rem;
+    font-weight: 600;
+    padding: 0.25rem 0.625rem;
+    border-radius: 999px;
+    white-space: nowrap;
+}
+.aluno-badge.emdia { background: #DCFCE7; color: #166534; }
+.aluno-badge.vencido { background: #FEE2E2; color: #991B1B; }
+.aluno-badge.negociar { background: #FEF3C7; color: #92400E; }
+
+.aluno-boletos {
+    display: flex;
+    flex-direction: column;
+    gap: 0.75rem;
+}
+
+.aluno-msg {
+    font-size: 0.9rem;
+    color: var(--text-muted);
+    margin: 0 0 0.25rem;
+}
+
+/* Vencimento: vermelho quando atrasado, neutro quando em dia */
+.boleto-info p.venc-atraso { color: var(--error); }
+.boleto-card.ok .boleto-info p.venc-ok { color: var(--text-muted); }
+
+.btn-pagar {
+    padding: 0.6rem 1.4rem;
+    font-size: 0.875rem;
+    flex-shrink: 0;
+}
+
+.boleto-indisponivel {
+    font-size: 0.8rem;
+    color: var(--error);
+    background: #fff0f0;
+    padding: 0.5rem 0.75rem;
+    border-radius: 8px;
+    flex-shrink: 0;
+}
+
+.aluno-aviso {
+    display: flex;
+    flex-direction: column;
+    gap: 0.75rem;
+}
+.aluno-aviso p {
+    font-size: 0.9rem;
+    color: var(--text-main);
+    margin: 0;
+}
+.aluno-aviso .btn-whatsapp { align-self: flex-start; }

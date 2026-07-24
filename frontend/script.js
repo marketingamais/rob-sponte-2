@@ -180,8 +180,120 @@ async function handleFormSubmit(e) {
 // Controle de Fluxo
 let currentProximoBoleto = null;
 
+// URL WhatsApp negociacao (mais de 5 dias de atraso)
+const WA_NEGOCIAR = 'https://wa.me/5508008860663?text=Gostaria%20de%20negociar%20meus%20d%C3%A9bitos%20do%20CIA!';
+
+// Primeiro + ultimo nome (ex.: "Maria Aparecida da Silva" -> "Maria Silva")
+function formatNome(nome) {
+    if (!nome) return '';
+    const parts = nome.toString().trim().split(/\s+/).filter(p => p.length > 0);
+    if (parts.length === 0) return '';
+    if (parts.length === 1) return parts[0];
+    return parts[0] + ' ' + parts[parts.length - 1];
+}
+
+// "209,9900" -> "R$ 209,99"
+function formatValor(v) {
+    if (v == null || v === '') return '';
+    let s = v.toString().trim().replace(/[^0-9.,]/g, '');
+    let intPart, decPart;
+    if (s.indexOf(',') !== -1) { const p = s.split(','); intPart = p[0]; decPart = p[1] || ''; }
+    else if (s.indexOf('.') !== -1) { const p = s.split('.'); intPart = p[0]; decPart = p[1] || ''; }
+    else { intPart = s; decPart = ''; }
+    decPart = (decPart + '00').slice(0, 2);
+    intPart = (intPart || '0').replace(/\B(?=(\d{3})+(?!\d))/g, '.');
+    return 'R$ ' + intPart + ',' + decPart;
+}
+
+// Card de um boleto (atrasada = vencido em vermelho)
+function boletoCardHTML(b, atrasada) {
+    const valor = formatValor(b.valor);
+    const info = atrasada
+        ? `<p class="venc-atraso">Venceu em ${b.dataVencimento}${valor ? ' &bull; ' + valor : ''}</p>`
+        : `<p class="venc-ok">Vence em ${b.dataVencimento}${valor ? ' &bull; ' + valor : ''}</p>`;
+    const acao = b.linhaDigitavel
+        ? `<button class="btn-whatsapp pill-shape btn-pagar" onclick="showLinhaDigitavel('${b.linhaDigitavel}', '${b.numParcela}', '${b.dataVencimento}')">Pagar</button>`
+        : `<span class="boleto-indisponivel">Boleto ainda não liberado</span>`;
+    return `
+        <div class="boleto-card ${atrasada ? '' : 'ok'}">
+            <div class="boleto-info">
+                <h4>Parcela ${b.numParcela}</h4>
+                ${info}
+            </div>
+            ${acao}
+        </div>`;
+}
+
+// NOVO: tela unica com boletos separados por filho
+function renderAlunosScreen(nomeResp, alunos) {
+    const titulo = document.getElementById('tituloPagarAtrasados');
+    const lista = document.getElementById('boletosList');
+
+    let sub;
+    if (alunos.length === 1) {
+        const a0 = alunos[0];
+        const nomeA = formatNome(a0.nomeAluno) || 'seu aluno';
+        const temBoletos = a0.boletos && a0.boletos.length > 0;
+        sub = (a0.status !== 'negociar' && temBoletos)
+            ? `Temos esses boletos para <strong>${nomeA}</strong> disponíveis:`
+            : `Veja a situação de <strong>${nomeA}</strong>:`;
+    } else {
+        sub = 'Veja os boletos disponíveis por aluno:';
+    }
+    titulo.innerHTML = `Olá, <strong>${nomeResp}</strong>!<span class="screen-subtitle">${sub}</span>`;
+
+    let html = '';
+    for (const a of alunos) {
+        const nomeA = formatNome(a.nomeAluno) || 'Aluno';
+        let badgeClass, badgeLabel, corpo;
+
+        if (a.status === 'negociar') {
+            badgeClass = 'negociar'; badgeLabel = 'Negociar';
+            corpo = `
+                <div class="aluno-aviso">
+                    <p>Mais de 5 dias de atraso. Entre em contato com a Amais para regularizar os débitos deste aluno.</p>
+                    <a href="${WA_NEGOCIAR}" target="_blank" class="btn-whatsapp pill-shape">
+                        <i class="ti ti-brand-whatsapp"></i> Falar com a Amais
+                    </a>
+                </div>`;
+        } else if (a.status === 'pagar_atrasados') {
+            badgeClass = 'vencido'; badgeLabel = 'Vencido';
+            const cards = (a.boletos || []).map(b => boletoCardHTML(b, true)).join('');
+            corpo = cards || `<p class="aluno-msg">Nenhum boleto disponível no momento.</p>`;
+        } else {
+            badgeClass = 'emdia'; badgeLabel = 'Em dia';
+            corpo = (a.boletos && a.boletos.length > 0)
+                ? `<p class="aluno-msg">Em dia! Sua próxima parcela:</p>` + a.boletos.map(b => boletoCardHTML(b, false)).join('')
+                : `<p class="aluno-msg">Você está em dia e não há parcelas liberadas no momento.</p>`;
+        }
+
+        html += `
+            <div class="aluno-bloco">
+                <div class="aluno-header">
+                    <span class="aluno-nome"><i class="ph ph-student"></i> ${nomeA}</span>
+                    <span class="aluno-badge ${badgeClass}">${badgeLabel}</span>
+                </div>
+                <div class="aluno-boletos">${corpo}</div>
+            </div>`;
+    }
+    lista.innerHTML = html;
+    openBoletosScreen();
+}
+
 function handleRobotResponse(data) {
     console.log('Resposta N8N:', data);
+
+    if (data && data.status !== 'erro' && Array.isArray(data.alunos) && data.alunos.length > 0) {
+        const nomeResp = formatNome(data.nomeResponsavel || data.nomeFormatado || 'Aluno') || 'Aluno';
+        renderAlunosScreen(nomeResp, data.alunos);
+        return;
+    }
+
+    return handleLegacy(data);
+}
+
+// Fallback: formato legado (status global, sem separacao por filho)
+function handleLegacy(data) {
     
     if (!data || Object.keys(data).length === 0 || (Array.isArray(data) && data.length === 0)) {
         openModal('modalCpfNaoEncontrado');
