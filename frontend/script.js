@@ -313,7 +313,7 @@ function handleLegacy(data) {
     if (data.status === 'erro') {
         if (data.message && data.message.includes('não possui senha')) {
             openModal('modalSemSenha');
-        } else if (data.message && (data.message.toLowerCase().includes('encontrado') || data.message.toLowerCase().includes('existe'))) {
+        } else if (data.message && (data.message.toLowerCase().includes('encontr') || data.message.toLowerCase().includes('existe') || data.message.toLowerCase().includes('secretaria'))) {
             openModal('modalCpfNaoEncontrado');
         } else if (data.message && data.message.toLowerCase().includes('falha ao acessar')) {
             document.getElementById('textoTimeout').innerText = `Desculpe, ${nome}! O sistema está com uma alta demanda ou demorando muito para responder no momento. Por favor, tente novamente!`;
