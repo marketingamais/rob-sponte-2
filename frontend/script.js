@@ -160,6 +160,10 @@ async function handleFormSubmit(e) {
                 data = jsonData;
                 break; // Sucesso, sai do loop
             } catch (err) {
+                // Timeout (AbortError): don't retry, rethrow immediately (n8n already retries 5x server-side)
+                if (err.name === 'AbortError') {
+                    throw err;
+                }
                 tentativas++;
                 if (tentativas >= maxTentativas) {
                     throw err; // Se já tentou tudo, joga o erro para o catch principal
