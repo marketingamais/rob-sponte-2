@@ -126,27 +126,37 @@ async function handleFormSubmit(e) {
     
     try {
         const webhookUrl = 'https://n8n.amais.io/webhook/buscar-boletos-novo';
-        
+
         let data = null;
         let tentativas = 0;
         const maxTentativas = 5;
 
         while (tentativas < maxTentativas) {
             try {
-                const response = await fetch(webhookUrl, {
-                    method: 'POST',
-                    headers: { 'Content-Type': 'application/json' },
-                    body: JSON.stringify({ cpf })
-                });
-                
-                // Se der erro 502/504 ou não conseguir fazer o parse do JSON, vai cair no catch interno
+                const ctrl = new AbortController();
+                const timer = setTimeout(() => ctrl.abort(), 150000); // robo ao vivo pode levar ~2 min
+                let response;
+                try {
+                    response = await fetch(webhookUrl, {
+                        method: 'POST',
+                        headers: { 'Content-Type': 'application/json' },
+                        body: JSON.stringify({ cpf }),
+                        signal: ctrl.signal
+                    });
+                } finally {
+                    clearTimeout(timer);
+                }
+
+                // 5xx (n8n/robo fora do ar): tenta de novo
+                if (response.status >= 500) throw new Error('HTTP ' + response.status);
+
                 const jsonData = await response.json();
-                
+
                 // Verifica se o N8N retornou erro de timeout (Error in workflow)
                 if (jsonData.message && jsonData.message.includes('Error in workflow')) {
                     throw new Error('N8N Timeout');
                 }
-                
+
                 data = jsonData;
                 break; // Sucesso, sai do loop
             } catch (err) {
@@ -311,6 +321,19 @@ function handleLegacy(data) {
     }
     
     if (data.status === 'erro') {
+        if (data.code === 'nao_encontrado') {
+            openModal('modalCpfNaoEncontrado');
+            return;
+        }
+        if (data.code === 'instabilidade') {
+            document.getElementById('textoTimeout').innerText = "Desculpe! O sistema da escola está instável ou demorando muito para responder no momento. Por favor, tente novamente em alguns minutos!";
+            openModal('modalTimeout');
+            return;
+        }
+        if (data.code === 'sem_senha') {
+            openModal('modalSemSenha');
+            return;
+        }
         if (data.message && data.message.includes('não possui senha')) {
             openModal('modalSemSenha');
         } else if (data.message && (data.message.toLowerCase().includes('encontr') || data.message.toLowerCase().includes('existe') || data.message.toLowerCase().includes('secretaria'))) {
