@@ -136,7 +136,7 @@ async function handleFormSubmit(e) {
         while (tentativas < maxTentativas) {
             try {
                 const ctrl = new AbortController();
-                const timer = setTimeout(() => ctrl.abort(), 150000); // robo ao vivo pode levar ~2 min
+                const timer = setTimeout(() => ctrl.abort(), 210000); // robo ao vivo pode levar ~3 min
                 let response;
                 try {
                     response = await fetch(webhookUrl, {
