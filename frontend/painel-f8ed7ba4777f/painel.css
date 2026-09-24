@@ -386,6 +386,10 @@ button.avatar:hover { box-shadow: 0 0 0 3px var(--accent); }
 /* Linha 3: funis */
 .funil-numeros { display: flex; align-items: center; gap: 12px; margin-top: 4px; }
 .card-funil .texto-apoio { margin-top: -8px; }
+.tendencia { display: inline-flex; align-items: center; gap: 2px; font-weight: 600; font-variant-numeric: tabular-nums; }
+.tendencia .ti { font-size: 14px; }
+.tendencia-sobe { color: var(--verde); }
+.tendencia-desce { color: var(--vermelho); }
 .grafico.barras-par { height: 120px; margin-top: auto; }
 
 /* Linha 4: financeiro */

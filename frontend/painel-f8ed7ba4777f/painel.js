@@ -283,11 +283,17 @@
             const c = card(chave);
             c.querySelector('[data-valor]').textContent = F.formatarNumero(x.agiram);
             const pil = c.querySelector('[data-taxa]'), a = ant && ant[chave];
-            const v = a ? F.variacao(x.taxa, a.taxa, 'pontos') : null, t = v === null ? '' : tendencia(v, 'bom');
-            pil.className = 'pilula ' + (t ? 'pilula-' + t : 'pilula-marca');
-            pil.innerHTML = `<i class="ti ${v > 0 ? 'ti-arrow-up-right' : v < 0 ? 'ti-arrow-down-right' : 'ti-percentage'}" aria-hidden="true"></i><span>${F.formatarPct(x.taxa)}</span>`;
-            pil.title = 'Taxa de conversão' + (v === null ? '' : ` · ${v > 0 ? '+' : v < 0 ? '−' : ''}${F.formatarVariacao(v, 'pontos')} vs período anterior`);
-            c.querySelector('[data-apoio]').textContent = `de ${F.formatarNumero(x.base)} consultas`;
+            // A pílula é sempre neutra e mostra só a taxa; a tendência (em p.p.) vai na linha de apoio
+            pil.className = 'pilula pilula-marca';
+            pil.textContent = F.formatarPct(x.taxa);
+            pil.title = 'Taxa de conversão';
+            const v = a && a.base ? F.variacao(x.taxa, a.taxa, 'pontos') : null;
+            const apoio = c.querySelector('[data-apoio]');
+            apoio.innerHTML = `de ${F.formatarNumero(x.base)} consultas`;
+            if (v !== null) {
+                const t = tendencia(v, 'bom'), icone = v > 0 ? 'ti-arrow-up-right' : v < 0 ? 'ti-arrow-down-right' : 'ti-minus';
+                apoio.innerHTML += ` · <span class="tendencia${t ? ' tendencia-' + t : ''}"><i class="ti ${icone}" aria-hidden="true"></i>${F.formatarVariacao(v, 'pontos')}</span> vs período anterior`;
+            }
             G.barrasPar(c.querySelector('[data-grafico]'), (x.dias || []).map(y => ({ rotulo: F.formatarDia(y.dia), titulo: F.formatarDia(y.dia), base: y.base, agiram: y.agiram })),
                 { corBase: 'var(--primary)', corAcao: '#9AA6D6', nomeBase: 'Consultaram', nomeAcao: 'Agiram', formatar: F.formatarNumero });
         }
