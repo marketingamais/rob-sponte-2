@@ -1,0 +1,251 @@
+<!DOCTYPE html>
+<html lang="pt-BR">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <meta name="robots" content="noindex,nofollow">
+    <title>Painel · Boletos CIA</title>
+    <link rel="icon" type="image/png" href="../assets/logo-cia.png">
+
+    <!-- Fonts -->
+    <link rel="preconnect" href="https://fonts.googleapis.com">
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&display=swap" rel="stylesheet">
+
+    <!-- Tabler Icons -->
+    <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/@tabler/icons-webfont@latest/tabler-icons.min.css">
+
+    <!-- Chart.js -->
+    <script src="https://cdn.jsdelivr.net/npm/chart.js@4.4.1/dist/chart.umd.min.js"></script>
+
+    <link rel="stylesheet" href="painel.css">
+
+    <script src="formatos.js" defer></script>
+    <script src="api.js" defer></script>
+    <script src="painel.js" defer></script>
+</head>
+<body>
+
+    <!-- ===== Tela de login ===== -->
+    <section id="telaLogin" class="tela-login">
+        <div class="login-card">
+            <img src="../assets/logo-cia.png" alt="CIA" class="login-logo">
+            <h1>Painel · Boletos CIA</h1>
+            <p class="login-subtitulo">Acesso restrito à administração.</p>
+            <form id="formLogin" class="form-login" novalidate>
+                <div class="campo">
+                    <label for="loginEmail">E-mail</label>
+                    <input type="email" id="loginEmail" name="email" autocomplete="username" required placeholder="voce@amais.io">
+                </div>
+                <div class="campo">
+                    <label for="loginSenha">Senha</label>
+                    <input type="password" id="loginSenha" name="senha" autocomplete="current-password" required placeholder="••••••••••">
+                </div>
+                <p id="loginErro" class="erro" hidden></p>
+                <button type="submit" id="btnEntrar" class="btn btn-primario btn-bloco">Entrar</button>
+            </form>
+        </div>
+    </section>
+
+    <!-- ===== App ===== -->
+    <div id="app" hidden>
+        <header class="topo">
+            <div class="topo-marca">
+                <img src="../assets/logo-cia.png" alt="CIA" class="topo-logo">
+                <span class="topo-titulo">Painel · Boletos CIA</span>
+            </div>
+            <div class="topo-usuario">
+                <div class="topo-usuario-info">
+                    <span id="usuarioNome" class="usuario-nome"></span>
+                    <span id="usuarioPapel" class="usuario-papel"></span>
+                </div>
+                <button type="button" id="btnSair" class="btn btn-secundario">
+                    <i class="ti ti-logout" aria-hidden="true"></i> Sair
+                </button>
+            </div>
+        </header>
+
+        <nav class="navegacao">
+            <button type="button" data-view="dashboard" class="nav-item ativo">
+                <i class="ti ti-layout-dashboard" aria-hidden="true"></i> Dashboard
+            </button>
+            <button type="button" id="navUsuarios" data-view="usuarios" class="nav-item" hidden>
+                <i class="ti ti-users" aria-hidden="true"></i> Usuários
+            </button>
+            <button type="button" data-view="conta" class="nav-item">
+                <i class="ti ti-user-circle" aria-hidden="true"></i> Minha conta
+            </button>
+        </nav>
+
+        <main class="conteudo">
+
+            <!-- ===== Dashboard ===== -->
+            <section id="viewDashboard" class="view">
+                <div class="periodo-barra">
+                    <div class="periodo-presets">
+                        <button type="button" data-periodo="hoje" class="btn btn-chip">Hoje</button>
+                        <button type="button" data-periodo="7d" class="btn btn-chip ativo">7 dias</button>
+                        <button type="button" data-periodo="30d" class="btn btn-chip">30 dias</button>
+                    </div>
+                    <div class="periodo-custom">
+                        <label for="periodoDe">De</label>
+                        <input type="date" id="periodoDe">
+                        <label for="periodoAte">Até</label>
+                        <input type="date" id="periodoAte">
+                        <button type="button" id="btnAplicarPeriodo" class="btn btn-secundario">Aplicar</button>
+                    </div>
+                </div>
+
+                <p id="dashboardErro" class="erro erro-bloco" hidden></p>
+
+                <div id="cards" class="cards">
+                    <div id="cardConsultas" class="card">
+                        <span class="card-titulo">Consultas</span>
+                        <strong class="card-valor">—</strong>
+                        <span class="card-sub"></span>
+                    </div>
+                    <div id="cardDebito" class="card">
+                        <span class="card-titulo">Com débito</span>
+                        <strong class="card-valor">—</strong>
+                        <span class="card-sub"></span>
+                    </div>
+                    <div id="cardEncaminhamentos" class="card">
+                        <span class="card-titulo">Encaminhamentos</span>
+                        <strong class="card-valor">—</strong>
+                        <span class="card-sub"></span>
+                    </div>
+                    <div id="cardResolucao" class="card card-destaque">
+                        <span class="card-titulo">Taxa de resolução</span>
+                        <strong class="card-valor">—</strong>
+                        <span class="card-sub"></span>
+                    </div>
+                    <div id="cardErros" class="card card-alerta">
+                        <span class="card-titulo">Taxa de erros</span>
+                        <strong class="card-valor">—</strong>
+                        <span class="card-sub"></span>
+                    </div>
+                </div>
+
+                <div class="paineis">
+                    <div class="painel-bloco">
+                        <h2>Erros por tela</h2>
+                        <ul id="listaErrosTela" class="lista-erros"></ul>
+                    </div>
+
+                    <div class="painel-bloco painel-grafico">
+                        <h2>Consultas por dia</h2>
+                        <div class="grafico-wrap">
+                            <canvas id="graficoDias" aria-label="Gráfico de consultas resolvidas e com erro por dia" role="img"></canvas>
+                        </div>
+                    </div>
+
+                    <div class="painel-bloco">
+                        <h2>Saúde do sistema</h2>
+                        <ul id="saude" class="lista-saude"></ul>
+                    </div>
+                </div>
+
+                <div class="rodape-dashboard">
+                    <p id="infoApoio" class="info-apoio"></p>
+                    <a id="linkPlanilha" class="link-planilha" href="#" target="_blank" rel="noopener" hidden>
+                        <i class="ti ti-external-link" aria-hidden="true"></i> Abrir planilha de erros
+                    </a>
+                </div>
+            </section>
+
+            <!-- ===== Usuarios ===== -->
+            <section id="viewUsuarios" class="view" hidden>
+                <div class="view-cabecalho">
+                    <h2>Usuários</h2>
+                    <button type="button" id="btnNovoUsuario" class="btn btn-primario">
+                        <i class="ti ti-plus" aria-hidden="true"></i> Novo usuário
+                    </button>
+                </div>
+
+                <p id="usuariosErro" class="erro erro-bloco" hidden></p>
+
+                <div class="tabela-wrap">
+                    <table id="tabelaUsuarios" class="tabela">
+                        <thead>
+                            <tr>
+                                <th>Nome</th>
+                                <th>E-mail</th>
+                                <th>Papel</th>
+                                <th>Status</th>
+                                <th>Ações</th>
+                            </tr>
+                        </thead>
+                        <tbody></tbody>
+                    </table>
+                </div>
+
+                <dialog id="dlgUsuario" class="dialogo">
+                    <form id="formUsuario" method="dialog" class="form-dialogo">
+                        <h2>Novo usuário</h2>
+                        <div class="campo">
+                            <label for="uNome">Nome</label>
+                            <input type="text" id="uNome" name="nome" required autocomplete="off">
+                        </div>
+                        <div class="campo">
+                            <label for="uEmail">E-mail</label>
+                            <input type="email" id="uEmail" name="email" required autocomplete="off">
+                        </div>
+                        <div class="campo">
+                            <label for="uPapel">Papel</label>
+                            <select id="uPapel" name="papel">
+                                <option value="membro">Membro</option>
+                                <option value="super_admin">Super administrador</option>
+                            </select>
+                        </div>
+                        <div class="campo">
+                            <label for="uSenha">Senha provisória</label>
+                            <div class="campo-senha">
+                                <input type="text" id="uSenha" name="senha" readonly>
+                                <button type="button" id="btnGerarSenha" class="btn btn-icone" title="Gerar nova senha" aria-label="Gerar nova senha">
+                                    <i class="ti ti-refresh" aria-hidden="true"></i>
+                                </button>
+                                <button type="button" id="btnCopiarSenha" class="btn btn-icone" title="Copiar senha" aria-label="Copiar senha">
+                                    <i class="ti ti-copy" aria-hidden="true"></i>
+                                </button>
+                            </div>
+                        </div>
+                        <p id="uErro" class="erro" hidden></p>
+                        <div class="dialogo-acoes">
+                            <button type="submit" value="cancelar" formnovalidate class="btn btn-secundario">Cancelar</button>
+                            <button type="submit" value="salvar" class="btn btn-primario">Salvar</button>
+                        </div>
+                    </form>
+                </dialog>
+
+                <dialog id="dlgConfirmar" class="dialogo dialogo-confirmar">
+                    <p id="confirmarTexto"></p>
+                    <div class="dialogo-acoes">
+                        <button type="button" id="btnConfirmarNao" class="btn btn-secundario">Cancelar</button>
+                        <button type="button" id="btnConfirmarSim" class="btn btn-perigo">Confirmar</button>
+                    </div>
+                </dialog>
+            </section>
+
+            <!-- ===== Minha conta ===== -->
+            <section id="viewConta" class="view" hidden>
+                <h2>Minha conta</h2>
+                <form id="formSenha" class="form-conta">
+                    <div class="campo">
+                        <label for="senhaNova">Nova senha</label>
+                        <input type="password" id="senhaNova" name="senhaNova" autocomplete="new-password" required minlength="10">
+                    </div>
+                    <div class="campo">
+                        <label for="senhaNova2">Confirmar nova senha</label>
+                        <input type="password" id="senhaNova2" name="senhaNova2" autocomplete="new-password" required minlength="10">
+                    </div>
+                    <p id="contaMsg" class="conta-msg" aria-live="polite"></p>
+                    <button type="submit" class="btn btn-primario">Alterar senha</button>
+                </form>
+            </section>
+
+        </main>
+    </div>
+
+    <p id="toast" class="toast" role="status" aria-live="polite" hidden></p>
+</body>
+</html>
