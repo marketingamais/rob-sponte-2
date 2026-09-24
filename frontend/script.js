@@ -115,6 +115,7 @@ async function handleFormSubmit(e) {
     const cpf = document.getElementById('cpf').value.replace(/\D/g, '');
     
     if (!validarCPF(cpf)) {
+        registrarEventoErro('cpf_invalido', cpf, null);
         document.getElementById('cpfError').classList.remove('hidden');
         return;
     }
@@ -123,7 +124,8 @@ async function handleFormSubmit(e) {
     openModal('modalLoading');
     startLoadingAnimation();
     initGame();
-    
+    const inicioConsulta = Date.now();
+
     try {
         const webhookUrl = 'https://n8n.amais.io/webhook/buscar-boletos-novo';
 
@@ -180,11 +182,12 @@ async function handleFormSubmit(e) {
         handleRobotResponse(data);
         
     } catch (error) {
+        registrarEventoErro('timeout_navegador', cpf, Date.now() - inicioConsulta);
         console.error('Erro após as tentativas:', error);
         stopLoadingAnimation();
         closeModal('modalLoading');
         cleanupGame();
-        
+
         // Se falhar por timeout ou erro do servidor, mostra o modal de tentar novamente com mensagem genérica
         document.getElementById('textoTimeout').innerText = "Desculpe! O sistema está com uma alta demanda ou demorando muito para responder no momento. Por favor, tente novamente!";
         openModal('modalTimeout');
@@ -196,6 +199,16 @@ let currentProximoBoleto = null;
 
 // URL WhatsApp negociacao (mais de 5 dias de atraso)
 const WA_NEGOCIAR = 'https://wa.me/5508008860663?text=Gostaria%20de%20negociar%20meus%20d%C3%A9bitos%20do%20CIA!';
+
+// Registra no painel erros que so o navegador ve (CPF invalido, timeout, erro desconhecido)
+const URL_EVENTO = 'https://n8n.amais.io/webhook/registrar-evento-front';
+function registrarEventoErro(code, cpf, duracaoMs) {
+    try {
+        const corpo = JSON.stringify({ code, cpf: String(cpf || '').replace(/\D/g, '').slice(0, 11), duracao_ms: duracaoMs == null ? null : Math.round(duracaoMs) });
+        if (navigator.sendBeacon) navigator.sendBeacon(URL_EVENTO, corpo);
+        else fetch(URL_EVENTO, { method: 'POST', body: corpo, keepalive: true }).catch(() => {});
+    } catch (e) { /* nunca atrapalha o site */ }
+}
 
 // Primeiro + ultimo nome (ex.: "Maria Aparecida da Silva" -> "Maria Silva")
 function formatNome(nome) {
@@ -399,6 +412,7 @@ function handleLegacy(data) {
             document.getElementById('textoTimeout').innerText = "Desculpe! O sistema está com uma alta demanda ou demorando muito para responder no momento. Por favor, tente novamente!";
             openModal('modalTimeout');
         } else {
+            registrarEventoErro('desconhecido', document.getElementById('cpf').value, null);
             alert("⚠️ Erro desconhecido ao processar o retorno. Tente novamente mais tarde.");
         }
     }

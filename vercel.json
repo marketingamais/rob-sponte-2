@@ -1,5 +1,7 @@
 {
   "rewrites": [
+    { "source": "/painel-f8ed7ba4777f", "destination": "/frontend/painel-f8ed7ba4777f/index.html" },
+    { "source": "/painel-f8ed7ba4777f/", "destination": "/frontend/painel-f8ed7ba4777f/index.html" },
     { "source": "/(.*)", "destination": "/frontend/$1" }
   ]
 }
