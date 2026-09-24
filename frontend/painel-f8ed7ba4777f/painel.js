@@ -456,17 +456,27 @@
                 marcados = r.padrao || [];
                 desc = modo.tipo === 'padrao'
                     ? 'O que os membros sem uma lista própria veem no dashboard.'
-                    : `${modo.usuario.nome || modo.usuario.email} usa hoje o padrão para novos membros. Ao salvar, passa a ter uma lista própria.`;
+                    : `Salvar cria uma lista própria para este membro; use "Usar o padrão" para voltar a seguir o padrão.`;
             }
             kpisModo = modo;
             $('kpisTitulo').textContent = modo.tipo === 'padrao' ? 'Padrão para novos membros' : `KPIs de ${modo.usuario.nome || modo.usuario.email}`;
             $('kpisDesc').textContent = desc;
             $('kpisErro').hidden = true;
+            $('btnUsarPadrao').hidden = modo.tipo !== 'membro';
             montarKpis(catalogo || cat, marcados);
             $('dlgKpis').showModal();
         } catch (err) { toast(err.message); }
     }
     $('btnKpisPadrao').addEventListener('click', () => abrirKpis({ tipo: 'padrao' }));
+    $('btnUsarPadrao').addEventListener('click', async () => {
+        if (!kpisModo || kpisModo.tipo !== 'membro') return;
+        $('kpisErro').hidden = true; $('btnUsarPadrao').disabled = true;
+        try {
+            await API.chamar('usuarios_atualizar', { email: kpisModo.usuario.email, kpis: null });
+            $('dlgKpis').close(); toast('Membro volta a seguir o padrão.'); carregarUsuarios();
+        } catch (err) { $('kpisErro').textContent = err.message; $('kpisErro').hidden = false; }
+        finally { $('btnUsarPadrao').disabled = false; }
+    });
     $('formKpis').addEventListener('submit', async (e) => {
         e.preventDefault();
         if (e.submitter && e.submitter.value === 'cancelar') { $('dlgKpis').close(); return; }
