@@ -20,12 +20,38 @@
         if (nome === '30d') return { de: menosDias(hoje, 29), ate: hoje };
         return { de: menosDias(hoje, 6), ate: hoje };
     }
+    // Mesmo número de dias, terminando na véspera de `de` (base dos "vs período anterior")
+    function periodoAnterior(p) {
+        const dias = Math.round((Date.parse(p.ate + 'T12:00:00Z') - Date.parse(p.de + 'T12:00:00Z')) / 86400000);
+        const ate = menosDias(p.de, 1);
+        return { de: menosDias(ate, dias), ate };
+    }
+    // Contagens: variação %; taxas (0..1): diferença em pontos percentuais. null quando não dá para comparar.
+    function variacao(atual, anterior, tipo) {
+        if (atual === null || atual === undefined || anterior === null || anterior === undefined) return null;
+        if (tipo === 'pontos') return Math.round((atual - anterior) * 1000) / 10;
+        if (!anterior) return atual ? null : 0;
+        return ((atual - anterior) / anterior) * 100;
+    }
+    function formatarVariacao(v, tipo) {
+        if (v === null || v === undefined || Number.isNaN(Number(v))) return '—';
+        const n = new Intl.NumberFormat('pt-BR', { maximumFractionDigits: 1 }).format(Math.abs(v));
+        return tipo === 'pontos' ? n + ' p.p.' : n + '%';
+    }
+    // Teto "redondo" do eixo Y (sequência 1-2-2,5-4-5-8 x 10^k), mínimo 4
+    function escalaMax(max) {
+        if (!(max > 4)) return 4;
+        const pot = Math.pow(10, Math.floor(Math.log10(max)));
+        for (const m of [1, 2, 2.5, 4, 5, 8, 10]) if (m * pot >= max) return m * pot;
+        return 10 * pot;
+    }
     function gerarSenha() {
         const A = 'ABCDEFGHJKLMNPQRSTUVWXYZabcdefghijkmnpqrstuvwxyz23456789';
         const c = (typeof crypto !== 'undefined' && crypto.getRandomValues) ? crypto : require('crypto').webcrypto;
         const b = new Uint32Array(14); c.getRandomValues(b);
         return Array.from(b, x => A[x % A.length]).join('');
     }
-    const api = { formatarNumero, formatarPct, formatarDuracao, formatarDia, periodoPreset, gerarSenha };
+    const api = { formatarNumero, formatarPct, formatarDuracao, formatarDia, periodoPreset, gerarSenha,
+        periodoAnterior, variacao, formatarVariacao, escalaMax };
     if (typeof module !== 'undefined' && module.exports) module.exports = api; else raiz.Formatos = api;
 })(typeof window !== 'undefined' ? window : globalThis);

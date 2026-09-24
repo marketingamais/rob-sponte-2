@@ -27,3 +27,30 @@ test('gerarSenha', () => {
     assert.match(s, /^[A-HJ-NP-Za-km-np-z2-9]+$/);
     assert.notStrictEqual(F.gerarSenha(), s);
 });
+test('periodoAnterior: mesma duracao, terminando na vespera', () => {
+    assert.deepStrictEqual(F.periodoAnterior({ de: '2026-09-18', ate: '2026-09-24' }), { de: '2026-09-11', ate: '2026-09-17' });
+    assert.deepStrictEqual(F.periodoAnterior({ de: '2026-09-24', ate: '2026-09-24' }), { de: '2026-09-23', ate: '2026-09-23' });
+    assert.deepStrictEqual(F.periodoAnterior({ de: '2026-03-01', ate: '2026-03-02' }), { de: '2026-02-27', ate: '2026-02-28' });
+});
+test('variacao: pct para contagens, pontos para taxas, null sem base', () => {
+    assert.strictEqual(F.variacao(12, 10), 20);
+    assert.strictEqual(F.variacao(5, 10), -50);
+    assert.strictEqual(F.variacao(3, 0), null);
+    assert.strictEqual(F.variacao(0, 0), 0);
+    assert.strictEqual(F.variacao(null, 4), null);
+    assert.strictEqual(F.variacao(0.6, 0.5, 'pontos'), 10);
+    assert.strictEqual(F.variacao(null, 0.5, 'pontos'), null);
+});
+test('formatarVariacao', () => {
+    assert.strictEqual(F.formatarVariacao(12.345), '12,3%');
+    assert.strictEqual(F.formatarVariacao(-4), '4%');
+    assert.strictEqual(F.formatarVariacao(2.5, 'pontos'), '2,5 p.p.');
+    assert.strictEqual(F.formatarVariacao(null), '—');
+});
+test('escalaMax: teto "redondo" para o eixo do grafico', () => {
+    assert.strictEqual(F.escalaMax(0), 4);
+    assert.strictEqual(F.escalaMax(3), 4);
+    assert.strictEqual(F.escalaMax(14), 20);
+    assert.strictEqual(F.escalaMax(37), 40);
+    assert.strictEqual(F.escalaMax(230), 250);
+});

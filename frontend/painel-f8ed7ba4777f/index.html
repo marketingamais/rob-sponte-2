@@ -7,21 +7,16 @@
     <title>Painel · Boletos CIA</title>
     <link rel="icon" type="image/png" href="../assets/logo-cia.png">
 
-    <!-- Fonts -->
     <link rel="preconnect" href="https://fonts.googleapis.com">
     <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
-    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&display=swap" rel="stylesheet">
-
-    <!-- Tabler Icons -->
-    <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/@tabler/icons-webfont@latest/tabler-icons.min.css">
-
-    <!-- Chart.js -->
-    <script src="https://cdn.jsdelivr.net/npm/chart.js@4.4.1/dist/chart.umd.min.js"></script>
+    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700&display=swap" rel="stylesheet">
+    <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/@tabler/icons-webfont@3.48.0/dist/tabler-icons.min.css">
 
     <link rel="stylesheet" href="painel.css">
 
     <script src="formatos.js" defer></script>
     <script src="api.js" defer></script>
+    <script src="graficos.js" defer></script>
     <script src="painel.js" defer></script>
 </head>
 <body>
@@ -32,7 +27,7 @@
             <img src="../assets/logo-cia.png" alt="CIA" class="login-logo">
             <h1>Painel · Boletos CIA</h1>
             <p class="login-subtitulo">Acesso restrito à administração.</p>
-            <form id="formLogin" class="form-login" novalidate>
+            <form id="formLogin" class="form" novalidate>
                 <div class="campo">
                     <label for="loginEmail">E-mail</label>
                     <input type="email" id="loginEmail" name="email" autocomplete="username" required placeholder="voce@amais.io">
@@ -48,204 +43,377 @@
     </section>
 
     <!-- ===== App ===== -->
-    <div id="app" hidden>
-        <header class="topo">
-            <div class="topo-marca">
-                <img src="../assets/logo-cia.png" alt="CIA" class="topo-logo">
-                <span class="topo-titulo">Painel · Boletos CIA</span>
+    <div id="app" class="shell" hidden>
+
+        <!-- Sidebar -->
+        <aside id="sidebar" class="sidebar" aria-label="Menu">
+            <div class="sb-header">
+                <a class="sb-marca" href="#" data-view="dashboard" data-dica="Boletos CIA">
+                    <img src="../assets/logo-cia.png" alt="" class="sb-logo">
+                    <span>Boletos CIA</span>
+                </a>
             </div>
-            <div class="topo-usuario">
-                <div class="topo-usuario-info">
-                    <span id="usuarioNome" class="usuario-nome"></span>
-                    <span id="usuarioPapel" class="usuario-papel"></span>
+
+            <nav class="sb-conteudo">
+                <div class="sb-grupo">
+                    <p class="sb-rotulo">Painel</p>
+                    <ul class="sb-menu">
+                        <li><button type="button" class="sb-item" data-view="dashboard" data-dica="Dashboard">
+                            <i class="ti ti-layout-grid" aria-hidden="true"></i><span>Dashboard</span></button></li>
+                    </ul>
                 </div>
-                <button type="button" id="btnSair" class="btn btn-secundario">
-                    <i class="ti ti-logout" aria-hidden="true"></i> Sair
-                </button>
-            </div>
-        </header>
-
-        <nav class="navegacao">
-            <button type="button" data-view="dashboard" class="nav-item ativo">
-                <i class="ti ti-layout-dashboard" aria-hidden="true"></i> Dashboard
-            </button>
-            <button type="button" id="navUsuarios" data-view="usuarios" class="nav-item" hidden>
-                <i class="ti ti-users" aria-hidden="true"></i> Usuários
-            </button>
-            <button type="button" data-view="conta" class="nav-item">
-                <i class="ti ti-user-circle" aria-hidden="true"></i> Minha conta
-            </button>
-        </nav>
-
-        <main class="conteudo">
-
-            <!-- ===== Dashboard ===== -->
-            <section id="viewDashboard" class="view">
-                <div class="periodo-barra">
-                    <div class="periodo-presets">
-                        <button type="button" data-periodo="hoje" class="btn btn-chip">Hoje</button>
-                        <button type="button" data-periodo="7d" class="btn btn-chip ativo">7 dias</button>
-                        <button type="button" data-periodo="30d" class="btn btn-chip">30 dias</button>
-                    </div>
-                    <div class="periodo-custom">
-                        <label for="periodoDe">De</label>
-                        <input type="date" id="periodoDe">
-                        <label for="periodoAte">Até</label>
-                        <input type="date" id="periodoAte">
-                        <button type="button" id="btnAplicarPeriodo" class="btn btn-secundario">Aplicar</button>
-                    </div>
+                <div class="sb-grupo" id="grupoAdmin" hidden>
+                    <p class="sb-rotulo">Administração</p>
+                    <ul class="sb-menu">
+                        <li><button type="button" class="sb-item" id="navUsuarios" data-view="usuarios" data-dica="Usuários">
+                            <i class="ti ti-users" aria-hidden="true"></i><span>Usuários</span></button></li>
+                    </ul>
                 </div>
-
-                <p id="dashboardErro" class="erro erro-bloco" hidden></p>
-
-                <div id="cards" class="cards">
-                    <div id="cardConsultas" class="card">
-                        <span class="card-titulo">Consultas</span>
-                        <strong class="card-valor">—</strong>
-                        <span class="card-sub"></span>
-                    </div>
-                    <div id="cardDebito" class="card">
-                        <span class="card-titulo">Com débito</span>
-                        <strong class="card-valor">—</strong>
-                        <span class="card-sub"></span>
-                    </div>
-                    <div id="cardEncaminhamentos" class="card">
-                        <span class="card-titulo">Encaminhamentos</span>
-                        <strong class="card-valor">—</strong>
-                        <span class="card-sub"></span>
-                    </div>
-                    <div id="cardResolucao" class="card card-destaque">
-                        <span class="card-titulo">Taxa de resolução</span>
-                        <strong class="card-valor">—</strong>
-                        <span class="card-sub"></span>
-                    </div>
-                    <div id="cardErros" class="card card-alerta">
-                        <span class="card-titulo">Taxa de erros</span>
-                        <strong class="card-valor">—</strong>
-                        <span class="card-sub"></span>
-                    </div>
+                <div class="sb-grupo">
+                    <p class="sb-rotulo">Conta</p>
+                    <ul class="sb-menu">
+                        <li><button type="button" class="sb-item" data-view="conta" data-dica="Minha conta">
+                            <i class="ti ti-user-circle" aria-hidden="true"></i><span>Minha conta</span></button></li>
+                    </ul>
                 </div>
+            </nav>
 
-                <div class="paineis">
-                    <div class="painel-bloco">
-                        <h2>Erros por tela</h2>
-                        <ul id="listaErrosTela" class="lista-erros"></ul>
-                    </div>
-
-                    <div class="painel-bloco painel-grafico">
-                        <h2>Consultas por dia</h2>
-                        <div class="grafico-wrap">
-                            <canvas id="graficoDias" aria-label="Gráfico de consultas resolvidas e com erro por dia" role="img"></canvas>
-                        </div>
-                    </div>
-
-                    <div class="painel-bloco">
-                        <h2>Saúde do sistema</h2>
-                        <ul id="saude" class="lista-saude"></ul>
-                    </div>
-                </div>
-
-                <div class="rodape-dashboard">
-                    <p id="infoApoio" class="info-apoio"></p>
-                    <a id="linkPlanilha" class="link-planilha" href="#" target="_blank" rel="noopener" hidden>
-                        <i class="ti ti-external-link" aria-hidden="true"></i> Abrir planilha de erros
-                    </a>
-                </div>
-            </section>
-
-            <!-- ===== Usuarios ===== -->
-            <section id="viewUsuarios" class="view" hidden>
-                <div class="view-cabecalho">
-                    <h2>Usuários</h2>
-                    <button type="button" id="btnNovoUsuario" class="btn btn-primario">
-                        <i class="ti ti-plus" aria-hidden="true"></i> Novo usuário
+            <div class="sb-rodape">
+                <div id="ultimoExport" class="sb-novidade" hidden>
+                    <span class="sb-novidade-selo">ÚLTIMO EXPORT</span>
+                    <p id="ultimoExportTitulo" class="sb-novidade-titulo"></p>
+                    <span id="ultimoExportDesc" class="sb-novidade-desc"></span>
+                    <a class="sb-novidade-link" href="#" target="_blank" rel="noopener" data-planilha hidden>Abrir planilha de erros</a>
+                    <button type="button" id="btnFecharExport" class="sb-novidade-fechar" aria-label="Fechar aviso">
+                        <i class="ti ti-x" aria-hidden="true"></i>
                     </button>
                 </div>
+                <ul class="sb-menu sb-menu-rodape">
+                    <li><a class="sb-item sb-item-sm" href="#" target="_blank" rel="noopener" data-planilha data-dica="Planilha de erros" hidden>
+                        <i class="ti ti-file-spreadsheet" aria-hidden="true"></i><span>Planilha de erros</span></a></li>
+                    <li><button type="button" class="sb-item sb-item-sm" data-sair data-dica="Sair">
+                        <i class="ti ti-logout" aria-hidden="true"></i><span>Sair</span></button></li>
+                </ul>
+                <p class="sb-copy">© <span id="anoAtual"></span> Amais · CIA</p>
+            </div>
+        </aside>
+        <div id="sbFundo" class="sb-fundo" hidden></div>
 
-                <p id="usuariosErro" class="erro erro-bloco" hidden></p>
-
-                <div class="tabela-wrap">
-                    <table id="tabelaUsuarios" class="tabela">
-                        <thead>
-                            <tr>
-                                <th>Nome</th>
-                                <th>E-mail</th>
-                                <th>Papel</th>
-                                <th>Status</th>
-                                <th>Ações</th>
-                            </tr>
-                        </thead>
-                        <tbody></tbody>
-                    </table>
+        <div class="inset">
+            <header class="topo">
+                <div class="topo-esq">
+                    <button type="button" id="btnSidebar" class="btn btn-fantasma btn-icone-sm" aria-label="Recolher menu" title="Recolher menu (Ctrl+B)">
+                        <i class="ti ti-layout-sidebar" aria-hidden="true"></i>
+                    </button>
+                    <span class="sep-v" aria-hidden="true"></span>
+                    <p class="migalha"><i id="migalhaIcone" class="ti ti-layout-grid" aria-hidden="true"></i><span id="migalhaTitulo">Dashboard</span></p>
                 </div>
+                <div class="topo-dir">
+                    <button type="button" id="btnAtualizar" class="btn btn-contorno btn-icone-sm" aria-label="Atualizar dados" title="Atualizar dados">
+                        <i class="ti ti-refresh" aria-hidden="true"></i>
+                    </button>
+                    <a class="btn btn-contorno btn-icone-sm some-mobile" href="#" target="_blank" rel="noopener" data-planilha aria-label="Abrir planilha de erros" title="Abrir planilha de erros" hidden>
+                        <i class="ti ti-file-spreadsheet" aria-hidden="true"></i>
+                    </a>
+                    <span class="sep-v" aria-hidden="true"></span>
+                    <div class="menu-usuario">
+                        <button type="button" id="btnAvatar" class="avatar" aria-haspopup="menu" aria-expanded="false" aria-controls="menuUsuario" aria-label="Menu do usuário">
+                            <span data-iniciais></span>
+                        </button>
+                        <div id="menuUsuario" class="dropdown" role="menu" hidden>
+                            <div class="dropdown-rotulo">
+                                <span class="avatar avatar-lg" aria-hidden="true"><span data-iniciais></span></span>
+                                <div class="dropdown-quem">
+                                    <span id="usuarioNome" class="dropdown-nome"></span>
+                                    <span id="usuarioEmail" class="dropdown-email"></span>
+                                    <span id="usuarioPapel" class="selo selo-suave"></span>
+                                </div>
+                            </div>
+                            <div class="dropdown-sep"></div>
+                            <button type="button" class="dropdown-item" role="menuitem" data-view="conta"><i class="ti ti-user" aria-hidden="true"></i>Minha conta</button>
+                            <div class="dropdown-sep"></div>
+                            <button type="button" class="dropdown-item dropdown-perigo" role="menuitem" data-sair><i class="ti ti-logout" aria-hidden="true"></i>Sair</button>
+                        </div>
+                    </div>
+                </div>
+            </header>
 
-                <dialog id="dlgUsuario" class="dialogo">
-                    <form id="formUsuario" method="dialog" class="form-dialogo">
-                        <h2>Novo usuário</h2>
-                        <div class="campo">
-                            <label for="uNome">Nome</label>
-                            <input type="text" id="uNome" name="nome" required autocomplete="off">
+            <main class="pagina">
+
+                <!-- ===== Dashboard ===== -->
+                <section id="viewDashboard" class="view">
+                    <div class="pagina-cabecalho">
+                        <div>
+                            <h1 class="pagina-titulo">Dashboard</h1>
+                            <p id="periodoTexto" class="pagina-desc">Consultas de boletos no período.</p>
                         </div>
-                        <div class="campo">
-                            <label for="uEmail">E-mail</label>
-                            <input type="email" id="uEmail" name="email" required autocomplete="off">
-                        </div>
-                        <div class="campo">
-                            <label for="uPapel">Papel</label>
-                            <select id="uPapel" name="papel">
-                                <option value="membro">Membro</option>
-                                <option value="super_admin">Super administrador</option>
-                            </select>
-                        </div>
-                        <div class="campo">
-                            <label for="uSenha">Senha provisória</label>
-                            <div class="campo-senha">
-                                <input type="text" id="uSenha" name="senha" readonly>
-                                <button type="button" id="btnGerarSenha" class="btn btn-icone" title="Gerar nova senha" aria-label="Gerar nova senha">
-                                    <i class="ti ti-refresh" aria-hidden="true"></i>
-                                </button>
-                                <button type="button" id="btnCopiarSenha" class="btn btn-icone" title="Copiar senha" aria-label="Copiar senha">
-                                    <i class="ti ti-copy" aria-hidden="true"></i>
-                                </button>
+                        <div class="barra-periodo">
+                            <div class="segmentado" role="group" aria-label="Período">
+                                <button type="button" data-periodo="hoje">Hoje</button>
+                                <button type="button" data-periodo="7d" class="ativo">7 dias</button>
+                                <button type="button" data-periodo="30d">30 dias</button>
+                            </div>
+                            <div class="intervalo">
+                                <input type="date" id="periodoDe" aria-label="De">
+                                <span class="intervalo-sep" aria-hidden="true">–</span>
+                                <input type="date" id="periodoAte" aria-label="Até">
+                                <button type="button" id="btnAplicarPeriodo" class="btn btn-contorno btn-sm">Aplicar</button>
                             </div>
                         </div>
-                        <p id="uErro" class="erro" hidden></p>
-                        <div class="dialogo-acoes">
-                            <button type="submit" value="cancelar" formnovalidate class="btn btn-secundario">Cancelar</button>
-                            <button type="submit" value="salvar" class="btn btn-primario">Salvar</button>
+                    </div>
+
+                    <p id="dashboardErro" class="alerta" hidden></p>
+
+                    <div id="grade" class="grade">
+                        <!-- KPIs -->
+                        <article class="card stat" id="statConsultas">
+                            <header class="card-cab card-cab-linha">
+                                <h3 class="stat-titulo">Consultas</h3>
+                                <i class="ti ti-info-circle stat-info" aria-hidden="true" title="Total de consultas feitas no site no período."></i>
+                            </header>
+                            <div class="card-corpo"><p class="stat-valor" data-valor>—</p></div>
+                            <footer class="card-pe"><span class="delta" data-delta></span><span class="texto-suave" data-pe>vs período anterior</span></footer>
+                        </article>
+                        <article class="card stat" id="statDebito">
+                            <header class="card-cab card-cab-linha">
+                                <h3 class="stat-titulo">Com débito</h3>
+                                <i class="ti ti-info-circle stat-info" aria-hidden="true" title="Consultas que devolveram linha digitável de parcela vencida."></i>
+                            </header>
+                            <div class="card-corpo"><p class="stat-valor" data-valor>—</p></div>
+                            <footer class="card-pe"><span class="delta" data-delta></span><span class="texto-suave" data-pe>vs período anterior</span></footer>
+                        </article>
+                        <article class="card stat" id="statEncaminhamentos">
+                            <header class="card-cab card-cab-linha">
+                                <h3 class="stat-titulo">Encaminhamentos</h3>
+                                <i class="ti ti-info-circle stat-info" aria-hidden="true" title="Famílias com mais de 5 dias de atraso, encaminhadas para a Amais."></i>
+                            </header>
+                            <div class="card-corpo"><p class="stat-valor" data-valor>—</p></div>
+                            <footer class="card-pe"><span class="delta" data-delta></span><span class="texto-suave" data-pe>vs período anterior</span></footer>
+                        </article>
+                        <article class="card stat" id="statResolucao">
+                            <header class="card-cab card-cab-linha">
+                                <h3 class="stat-titulo">Taxa de resolução</h3>
+                                <i class="ti ti-info-circle stat-info" id="dicaResolucao" aria-hidden="true" title="Consultas que não terminaram em pop-up de erro."></i>
+                            </header>
+                            <div class="card-corpo"><p class="stat-valor" data-valor>—</p></div>
+                            <footer class="card-pe"><span class="delta" data-delta></span><span class="texto-suave" data-pe>vs período anterior</span></footer>
+                        </article>
+
+                        <!-- Consultas por dia (barras) -->
+                        <article class="card card-sem-gap span-2">
+                            <header class="card-cab">
+                                <div class="titulo-com-selo">
+                                    <h3 class="card-titulo">Consultas por dia</h3>
+                                    <span id="seloConsultas" class="delta delta-selo" hidden></span>
+                                </div>
+                                <p class="card-desc">Total de consultas por dia no período.</p>
+                            </header>
+                            <div class="card-corpo">
+                                <div id="graficoBarras" class="grafico" role="img" aria-label="Gráfico de consultas por dia"></div>
+                            </div>
+                        </article>
+
+                        <!-- Resolvidas e erros (linhas em degrau) -->
+                        <article class="card card-sem-gap span-2">
+                            <header class="card-cab">
+                                <div class="titulo-com-selo">
+                                    <h3 class="card-titulo">Resolvidas e erros</h3>
+                                    <span id="seloErros" class="delta delta-selo" hidden></span>
+                                </div>
+                                <p class="card-desc">
+                                    <span class="legenda"><span class="legenda-cor cor-resolvidas"></span>Resolvidas</span>
+                                    <span class="legenda"><span class="legenda-cor cor-erros"></span>Erros</span>
+                                    <span id="taxaErrosTexto"></span>
+                                </p>
+                            </header>
+                            <div class="card-corpo">
+                                <div id="graficoLinhas" class="grafico" role="img" aria-label="Gráfico de consultas resolvidas e com erro por dia"></div>
+                            </div>
+                        </article>
+
+                        <!-- Erros por tela (tabela) -->
+                        <article id="cardErrosTela" class="card card-sem-gap span-2 card-tabela">
+                            <header class="card-cab com-borda">
+                                <h3 class="card-titulo card-titulo-base">Erros por tela</h3>
+                                <p class="card-desc">Onde as pessoas pararam no período.</p>
+                            </header>
+                            <div class="card-corpo sem-lateral">
+                                <table class="tabela">
+                                    <caption class="sr-only">Erros por tela com quantidade e percentual.</caption>
+                                    <thead><tr><th class="ps-6">Tela</th><th class="num">Qtd</th><th class="num pe-6">% dos erros</th></tr></thead>
+                                    <tbody id="listaErrosTela"></tbody>
+                                </table>
+                            </div>
+                            <div class="tabela-rodape">
+                                <a class="btn btn-fantasma" href="#" target="_blank" rel="noopener" data-planilha hidden>
+                                    Abrir planilha de erros <i class="ti ti-arrow-right" aria-hidden="true"></i>
+                                </a>
+                            </div>
+                        </article>
+
+                        <!-- Saude do sistema -->
+                        <article class="card card-sem-gap">
+                            <header class="card-cab com-borda">
+                                <h3 class="card-titulo card-titulo-base">Saúde do sistema</h3>
+                                <p id="saudeResumo" class="card-desc">Verificando…</p>
+                            </header>
+                            <div class="card-corpo sem-lateral card-corpo-cheio">
+                                <div id="saudeVazio" class="vazio" hidden>
+                                    <span class="vazio-midia"><i class="ti ti-circle-check" aria-hidden="true"></i></span>
+                                    <p class="vazio-titulo">Tudo certo por aqui.</p>
+                                    <p class="vazio-desc">Robô, export, cache e erros dentro do esperado.</p>
+                                    <button type="button" id="btnVerSaude" class="btn btn-fantasma">Ver detalhes <i class="ti ti-arrow-right" aria-hidden="true"></i></button>
+                                </div>
+                                <ul id="saude" class="lista-saude"></ul>
+                            </div>
+                        </article>
+
+                        <!-- Origem das respostas -->
+                        <article class="card card-sem-gap">
+                            <header class="card-cab com-borda">
+                                <h3 class="card-titulo">Origem das respostas</h3>
+                                <p id="tempoMedio" class="card-desc">Tempo médio de resposta: —</p>
+                            </header>
+                            <div class="card-corpo sem-lateral">
+                                <ul id="listaOrigem" class="lista-atividade"></ul>
+                            </div>
+                        </article>
+                    </div>
+                </section>
+
+                <!-- ===== Usuarios ===== -->
+                <section id="viewUsuarios" class="view" hidden>
+                    <div class="pagina-cabecalho">
+                        <div>
+                            <h1 class="pagina-titulo">Usuários</h1>
+                            <p class="pagina-desc">Quem pode acessar este painel.</p>
                         </div>
-                    </form>
-                </dialog>
-
-                <dialog id="dlgConfirmar" class="dialogo dialogo-confirmar">
-                    <p id="confirmarTexto"></p>
-                    <div class="dialogo-acoes">
-                        <button type="button" id="btnConfirmarNao" class="btn btn-secundario">Cancelar</button>
-                        <button type="button" id="btnConfirmarSim" class="btn btn-perigo">Confirmar</button>
+                        <button type="button" id="btnNovoUsuario" class="btn btn-primario">
+                            <i class="ti ti-plus" aria-hidden="true"></i> Novo usuário
+                        </button>
                     </div>
-                </dialog>
-            </section>
 
-            <!-- ===== Minha conta ===== -->
-            <section id="viewConta" class="view" hidden>
-                <h2>Minha conta</h2>
-                <form id="formSenha" class="form-conta">
-                    <div class="campo">
-                        <label for="senhaNova">Nova senha</label>
-                        <input type="password" id="senhaNova" name="senhaNova" autocomplete="new-password" required minlength="10">
-                    </div>
-                    <div class="campo">
-                        <label for="senhaNova2">Confirmar nova senha</label>
-                        <input type="password" id="senhaNova2" name="senhaNova2" autocomplete="new-password" required minlength="10">
-                    </div>
-                    <p id="contaMsg" class="conta-msg" aria-live="polite"></p>
-                    <button type="submit" class="btn btn-primario">Alterar senha</button>
-                </form>
-            </section>
+                    <p id="usuariosErro" class="alerta" hidden></p>
 
-        </main>
+                    <div class="card card-sem-gap card-solto">
+                        <div class="tabela-wrap">
+                            <table id="tabelaUsuarios" class="tabela">
+                                <thead>
+                                    <tr>
+                                        <th class="ps-6">Nome</th>
+                                        <th>E-mail</th>
+                                        <th>Papel</th>
+                                        <th>Status</th>
+                                        <th class="pe-6">Ações</th>
+                                    </tr>
+                                </thead>
+                                <tbody></tbody>
+                            </table>
+                        </div>
+                    </div>
+                </section>
+
+                <!-- ===== Minha conta ===== -->
+                <section id="viewConta" class="view" hidden>
+                    <div class="pagina-cabecalho">
+                        <div>
+                            <h1 class="pagina-titulo">Minha conta</h1>
+                            <p class="pagina-desc">Seus dados de acesso ao painel.</p>
+                        </div>
+                    </div>
+                    <div class="grade grade-conta">
+                        <article class="card">
+                            <header class="card-cab">
+                                <h3 class="card-titulo">Perfil</h3>
+                                <p class="card-desc">Para mudar nome ou papel, fale com um super administrador.</p>
+                            </header>
+                            <div class="card-corpo perfil">
+                                <span class="avatar avatar-xl" aria-hidden="true"><span data-iniciais></span></span>
+                                <div>
+                                    <p id="contaNome" class="perfil-nome"></p>
+                                    <p id="contaEmail" class="texto-suave"></p>
+                                    <span id="contaPapel" class="selo selo-suave"></span>
+                                </div>
+                            </div>
+                        </article>
+                        <article class="card">
+                            <header class="card-cab">
+                                <h3 class="card-titulo">Alterar senha</h3>
+                                <p class="card-desc">Use pelo menos 10 caracteres.</p>
+                            </header>
+                            <div class="card-corpo">
+                                <form id="formSenha" class="form">
+                                    <div class="campo">
+                                        <label for="senhaNova">Nova senha</label>
+                                        <input type="password" id="senhaNova" name="senhaNova" autocomplete="new-password" required minlength="10">
+                                    </div>
+                                    <div class="campo">
+                                        <label for="senhaNova2">Confirmar nova senha</label>
+                                        <input type="password" id="senhaNova2" name="senhaNova2" autocomplete="new-password" required minlength="10">
+                                    </div>
+                                    <p id="contaMsg" class="conta-msg" aria-live="polite"></p>
+                                    <div><button type="submit" class="btn btn-primario">Alterar senha</button></div>
+                                </form>
+                            </div>
+                        </article>
+                    </div>
+                </section>
+
+            </main>
+        </div>
     </div>
 
+    <!-- ===== Dialogos ===== -->
+    <dialog id="dlgUsuario" class="dialogo">
+        <form id="formUsuario" method="dialog" class="form">
+            <div class="dialogo-cab">
+                <h2>Novo usuário</h2>
+                <p class="card-desc">A pessoa entra com o e-mail e a senha provisória abaixo.</p>
+            </div>
+            <div class="campo">
+                <label for="uNome">Nome</label>
+                <input type="text" id="uNome" name="nome" required autocomplete="off">
+            </div>
+            <div class="campo">
+                <label for="uEmail">E-mail</label>
+                <input type="email" id="uEmail" name="email" required autocomplete="off">
+            </div>
+            <div class="campo">
+                <label for="uPapel">Papel</label>
+                <select id="uPapel" name="papel">
+                    <option value="membro">Membro</option>
+                    <option value="super_admin">Super administrador</option>
+                </select>
+            </div>
+            <div class="campo">
+                <label for="uSenha">Senha provisória</label>
+                <div class="campo-senha">
+                    <input type="text" id="uSenha" name="senha" readonly>
+                    <button type="button" id="btnGerarSenha" class="btn btn-contorno btn-icone" title="Gerar nova senha" aria-label="Gerar nova senha">
+                        <i class="ti ti-refresh" aria-hidden="true"></i>
+                    </button>
+                    <button type="button" id="btnCopiarSenha" class="btn btn-contorno btn-icone" title="Copiar senha" aria-label="Copiar senha">
+                        <i class="ti ti-copy" aria-hidden="true"></i>
+                    </button>
+                </div>
+            </div>
+            <p id="uErro" class="erro" hidden></p>
+            <div class="dialogo-acoes">
+                <button type="submit" value="cancelar" formnovalidate class="btn btn-contorno">Cancelar</button>
+                <button type="submit" value="salvar" class="btn btn-primario">Salvar</button>
+            </div>
+        </form>
+    </dialog>
+
+    <dialog id="dlgConfirmar" class="dialogo dialogo-confirmar">
+        <p id="confirmarTexto"></p>
+        <div class="dialogo-acoes">
+            <button type="button" id="btnConfirmarNao" class="btn btn-contorno">Cancelar</button>
+            <button type="button" id="btnConfirmarSim" class="btn btn-perigo">Confirmar</button>
+        </div>
+    </dialog>
+
+    <div id="dica" class="dica" role="tooltip" hidden></div>
     <p id="toast" class="toast" role="status" aria-live="polite" hidden></p>
 </body>
 </html>
