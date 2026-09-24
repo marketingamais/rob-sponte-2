@@ -2,7 +2,7 @@
     const F = window.Formatos, API = window.PainelApi, G = window.Graficos;
     const $ = (id) => document.getElementById(id);
     const $$ = (sel) => document.querySelectorAll(sel);
-    let usuarioAtual = null, periodo = null, verSaudeDetalhe = false, carregamento = 0;
+    let usuarioAtual = null, periodo = null, carregamento = 0;
     const hojeSP = () => new Date().toLocaleDateString('en-CA', { timeZone: 'America/Sao_Paulo' });
     const guardar = (k, v) => { try { localStorage.setItem(k, v); } catch (e) {} };
     const ler = (k) => { try { return localStorage.getItem(k); } catch (e) { return null; } };
@@ -53,7 +53,10 @@
     $('formLogin').addEventListener('submit', async (e) => {
         e.preventDefault();
         $('loginErro').hidden = true; $('btnEntrar').disabled = true;
-        try { const s = await API.entrar($('loginEmail').value.trim(), $('loginSenha').value); $('loginSenha').value = ''; mostrarApp(s.usuario); }
+        try {
+            const s = await API.entrar($('loginEmail').value.trim(), $('loginSenha').value); $('loginSenha').value = ''; catalogo = null; mostrarApp(s.usuario);
+            if (s.usuario && s.usuario.papel === 'super_admin') obterCatalogo().catch(() => {});
+        }
         catch (err) { $('loginErro').textContent = err.message; $('loginErro').hidden = false; }
         finally { $('btnEntrar').disabled = false; }
     });
@@ -122,38 +125,97 @@
         if (!$('viewDashboard').hidden) carregarDashboard();
         else if (!$('viewUsuarios').hidden) carregarUsuarios();
     });
-    $('btnVerSaude').addEventListener('click', () => { verSaudeDetalhe = true; $('saudeVazio').hidden = true; $('saude').hidden = false; });
 
-    // Delta: sentido 'bom' (subir = verde), 'ruim' (subir = vermelho) ou 'neutro'
-    function pintarDelta(alvo, v, tipo, sentido, selo) {
-        alvo.className = 'delta' + (selo ? ' delta-selo' : '');
-        if (v === null || v === undefined) { alvo.innerHTML = '<i class="ti ti-minus" aria-hidden="true"></i><span>—</span>'; return; }
-        const bom = (v > 0 && sentido === 'bom') || (v < 0 && sentido === 'ruim');
-        const ruim = (v < 0 && sentido === 'bom') || (v > 0 && sentido === 'ruim');
-        if (bom) alvo.classList.add('sobe'); else if (ruim) alvo.classList.add('desce');
-        const icone = v === 0 ? 'ti-minus' : selo ? (v > 0 ? 'ti-trending-up' : 'ti-trending-down') : (v > 0 ? 'ti-chevron-up' : 'ti-chevron-down');
+    // Pílula de variação: sentido 'bom' (subir = verde), 'ruim' (subir = vermelho) ou 'neutro'.
+    // Devolve 'sobe' | 'desce' | '' (a tendência, para o hover do card).
+    function tendencia(v, sentido) {
+        if (v === null || v === undefined || v === 0 || sentido === 'neutro') return '';
+        return (v > 0) === (sentido === 'bom') ? 'sobe' : 'desce';
+    }
+    function pintarPilula(alvo, v, tipo, sentido) {
+        const t = tendencia(v, sentido);
+        alvo.className = 'pilula' + (t ? ' pilula-' + t : '');
+        const icone = !v ? 'ti-minus' : v > 0 ? 'ti-arrow-up-right' : 'ti-arrow-down-right';
         alvo.innerHTML = `<i class="ti ${icone}" aria-hidden="true"></i><span>${F.formatarVariacao(v, tipo)}</span>`;
         alvo.title = (v > 0 ? 'Subiu ' : v < 0 ? 'Caiu ' : 'Igual: ') + F.formatarVariacao(v, tipo) + ' em relação ao período anterior';
+        alvo.hidden = false;
+        return t;
     }
-    function stat(id, valor, v, tipo, sentido, temBase) {
-        const c = $(id);
-        c.querySelector('[data-valor]').textContent = valor;
-        const d = c.querySelector('[data-delta]');
-        if (temBase) { d.hidden = false; pintarDelta(d, v, tipo, sentido, false); c.querySelector('[data-pe]').textContent = 'vs período anterior'; }
-        else { d.hidden = true; c.querySelector('[data-pe]').textContent = 'sem período anterior para comparar'; }
+    const card = (chave) => document.querySelector(`#grade [data-kpi="${chave}"]`);
+    const campo = (chave, nome) => { const c = card(chave); return c && c.querySelector(`[data-${nome}]`); };
+
+    // KPI de volume: valor, pílula e "vs n no período anterior"
+    function kpiVolume(chave, d, ant) {
+        const c = card(chave), atual = d[chave], anterior = ant && ant[chave];
+        if (!c || !atual) return;
+        c.querySelector('[data-valor]').textContent = F.formatarNumero(atual.valor);
+        const v = anterior ? F.variacao(atual.valor, anterior.valor) : null;
+        const pil = c.querySelector('[data-delta]'), pe = c.querySelector('[data-pe]');
+        if (v === null) {
+            pil.hidden = true; c.dataset.tendencia = '';
+            pe.textContent = anterior ? `${F.formatarNumero(anterior.valor)} no período anterior` : 'sem período anterior para comparar';
+            return;
+        }
+        c.dataset.tendencia = pintarPilula(pil, v, 'pct', c.dataset.sentido);
+        pe.textContent = `vs ${F.formatarNumero(anterior.valor)} no período anterior`;
     }
+
+    // Esconde os blocos sem permissão e recalcula as colunas de cada linha da grade
+    // (desktop: 12 ÷ visíveis da linha; tablet: em pares, o último ímpar ocupa a linha).
+    function organizarGrade(permitidos) {
+        const blocos = Array.from($('grade').querySelectorAll(':scope > [data-kpi]'));
+        blocos.forEach(el => { el.hidden = !permitidos.includes(el.dataset.kpi); });
+        const vis = blocos.filter(el => !el.hidden);
+        vis.forEach((el, i) => el.style.setProperty('--i', i));
+        const linhas = {};
+        vis.forEach(el => (linhas[el.dataset.linha] = linhas[el.dataset.linha] || []).push(el));
+        const definir = (el, span, spanT, n) => {
+            el.style.setProperty('--span', span); el.style.setProperty('--span-t', spanT); el.style.setProperty('--linhas', n || 1);
+        };
+        for (const [linha, els] of Object.entries(linhas)) {
+            if (linha === '2') {
+                const comp = els.find(el => el.dataset.kpi === 'comparativo_diario');
+                const lat = els.filter(el => el !== comp);
+                if (comp) definir(comp, lat.length ? 8 : 12, 12, lat.length === 2 ? 2 : 1);
+                lat.forEach(el => definir(el, comp ? 4 : 12 / lat.length, lat.length === 2 ? 6 : 12));
+                continue;
+            }
+            els.forEach((el, i) => definir(el, 12 / els.length, (els.length % 2 && i === els.length - 1) ? 12 : 6));
+        }
+        $('dashboardVazio').hidden = vis.length > 0;
+    }
+
     function esqueleto() {
         $('grade').classList.add('carregando');
-        $$('.stat [data-valor]').forEach(e => { e.innerHTML = '<span class="esqueleto" style="width:4.5rem;height:1.75rem"></span>'; });
+        $$('#grade [data-valor]').forEach(e => { e.innerHTML = '<span class="esqueleto" style="width:5rem;height:1.6rem"></span>'; });
     }
 
     const ORIGENS = {
-        cache: { icone: 'ti-database', titulo: 'Cache do dia', sub: 'Resposta imediata do banco' },
-        cache_antigo: { icone: 'ti-history', titulo: 'Cache anterior', sub: 'Robô fora do ar; usamos o último dado' },
-        ao_vivo: { icone: 'ti-robot', titulo: 'Robô ao vivo', sub: 'Consulta direta na Sponte' },
-        navegador: { icone: 'ti-world', titulo: 'Erro no navegador', sub: 'CPF inválido ou tempo esgotado' },
-        sem_dados: { icone: 'ti-circle-off', titulo: 'Sem dados', sub: 'CPF não encontrado ou inválido' }
+        cache: { icone: 'ti-database', titulo: 'Cache do dia', sub: 'Resposta imediata do banco', sentido: 'neutro' },
+        cache_antigo: { icone: 'ti-history', titulo: 'Cache anterior', sub: 'Robô fora do ar; usamos o último dado', sentido: 'ruim' },
+        ao_vivo: { icone: 'ti-robot', titulo: 'Robô ao vivo', sub: 'Consulta direta na Sponte', sentido: 'neutro' },
+        navegador: { icone: 'ti-world', titulo: 'Erro no navegador', sub: 'CPF inválido ou tempo esgotado', sentido: 'ruim' },
+        sem_dados: { icone: 'ti-circle-off', titulo: 'Sem dados', sub: 'CPF não encontrado ou inválido', sentido: 'ruim' }
     };
+    const NIVEIS = {
+        verde: { icone: 'ti-check', classe: 'seta-sobe', nome: 'OK' },
+        amarelo: { icone: 'ti-alert-triangle', classe: 'seta-atencao', nome: 'Atenção' },
+        vermelho: { icone: 'ti-alert-octagon', classe: 'seta-desce', nome: 'Crítico' }
+    };
+    const ICONES_SAUDE = { 'Robô': 'ti-robot', 'Último export': 'ti-file-export', 'Idade do cache': 'ti-database', 'Erros nas últimas 24h': 'ti-alert-circle' };
+    // Seta num círculo comparando com o período anterior (sem base: traço neutro)
+    function seta(atual, anterior, sentido) {
+        if (anterior === null || anterior === undefined) return '<span class="seta" aria-hidden="true"><i class="ti ti-minus"></i></span>';
+        const v = atual - anterior, t = tendencia(v, sentido);
+        const icone = v > 0 ? 'ti-arrow-up-right' : v < 0 ? 'ti-arrow-down-right' : 'ti-minus';
+        const dica = v === 0 ? 'Igual ao período anterior' : `${v > 0 ? 'Subiu' : 'Caiu'} ${F.formatarNumero(Math.abs(v))} vs período anterior`;
+        return `<span class="seta${t ? ' seta-' + t : ''}" title="${dica}"><i class="ti ${icone}" aria-hidden="true"></i><span class="sr-only">${dica}</span></span>`;
+    }
+    function itemMetrica(icone, rotulo, sub, valor, direita) {
+        return `<li><i class="ti ${icone} metrica-icone" aria-hidden="true"></i>
+            <div class="metrica-texto"><p class="metrica-rotulo">${esc(rotulo)}</p>${sub ? `<p class="metrica-sub">${esc(sub)}</p>` : ''}</div>
+            <span class="metrica-valor">${valor}</span>${direita}</li>`;
+    }
 
     async function carregarDashboard() {
         if (!periodo) definirPeriodo(F.periodoPreset('7d', hojeSP()));
@@ -168,65 +230,118 @@
         $('grade').classList.remove('carregando');
         if (atual.status !== 'fulfilled') {
             $('dashboardErro').textContent = atual.reason.message; $('dashboardErro').hidden = false;
-            $$('.stat [data-valor]').forEach(e => { e.textContent = '—'; });
+            $$('#grade [data-valor]').forEach(e => { e.textContent = '—'; });
             return;
         }
-        desenharDashboard(atual.value, anterior.status === 'fulfilled' ? anterior.value.dashboard : null);
+        desenharDashboard(atual.value, anterior.status === 'fulfilled' ? (anterior.value.dados || null) : null);
     }
 
     function desenharDashboard(r, ant) {
-        const d = r.dashboard, base = !!(ant && ant.total);
-        $('periodoTexto').textContent = `Consultas de boletos de ${F.formatarDia(d.periodo.de)} a ${F.formatarDia(d.periodo.ate)}.`;
+        const d = r.dados || {}, permitidos = Array.isArray(r.kpis) ? r.kpis : [];
+        const p = r.periodo || periodo;
+        $('periodoTexto').textContent = p.de === p.ate
+            ? `Consultas de boletos em ${F.formatarDia(p.de)}.`
+            : `Consultas de boletos de ${F.formatarDia(p.de)} a ${F.formatarDia(p.ate)}.`;
+        organizarGrade(permitidos);
 
-        // KPIs
-        stat('statConsultas', F.formatarNumero(d.total), base ? F.variacao(d.total, ant.total) : null, 'pct', 'bom', base);
-        stat('statDebito', F.formatarNumero(d.debito), base ? F.variacao(d.debito, ant.debito) : null, 'pct', 'neutro', base);
-        stat('statEncaminhamentos', F.formatarNumero(d.encaminhamento), base ? F.variacao(d.encaminhamento, ant.encaminhamento) : null, 'pct', 'neutro', base);
-        stat('statResolucao', F.formatarPct(d.taxaResolucao), base ? F.variacao(d.taxaResolucao, ant.taxaResolucao, 'pontos') : null, 'pontos', 'bom', base);
-        $('dicaResolucao').title = `Consultas que não terminaram em pop-up de erro. Em dia com boleto: ${F.formatarNumero(d.emDiaBoleto)} · sem boleto: ${F.formatarNumero(d.emDiaSemBoleto + d.atrasadoSemLinha)}.`;
+        // Linha 1: volume
+        ['consultas_total', 'consultas_em_dia', 'consultas_debito', 'encaminhamentos'].forEach(k => kpiVolume(k, d, ant));
 
-        // Selos dos gráficos
-        const sc = $('seloConsultas'), se = $('seloErros');
-        sc.hidden = !base; if (base) pintarDelta(sc, F.variacao(d.total, ant.total), 'pct', 'bom', true);
-        se.hidden = !base; if (base) pintarDelta(se, F.variacao(d.taxaErros, ant.taxaErros, 'pontos'), 'pontos', 'ruim', true);
-        $('taxaErrosTexto').textContent = d.total ? `· ${F.formatarPct(d.taxaErros)} com erro (${F.formatarNumero(d.erros)})` : '';
+        // Linha 2: comparativo diário
+        if (d.comparativo_diario) {
+            const dias = d.comparativo_diario.dias.map(x => ({ rotulo: F.formatarDia(x.dia), titulo: F.formatarDia(x.dia),
+                valores: { total: x.total, emDia: x.emDia, debito: x.debito, encaminhamentos: x.encaminhamentos } }));
+            G.areas($('graficoComparativo'), dias, [
+                { chave: 'total', nome: 'Consultas', cor: 'var(--primary)' },
+                { chave: 'emDia', nome: 'Em dia', cor: '#10B981' },
+                { chave: 'debito', nome: 'Com débito', cor: '#F59E0B' },
+                { chave: 'encaminhamentos', nome: 'Encaminhados', cor: '#E11D48' }
+            ], { vazio: 'Sem consultas no período.', formatar: F.formatarNumero });
+        }
 
-        // Gráficos
-        const dias = d.porDia.map(p => ({ rotulo: F.formatarDia(p.dia), titulo: F.formatarDia(p.dia), valor: p.resolvidas + p.erros, valores: { resolvidas: p.resolvidas, erros: p.erros } }));
-        G.barras($('graficoBarras'), dias, { nome: 'Consultas', cor: 'var(--chart-1)' }, { vazio: 'Sem consultas no período.', formatar: F.formatarNumero });
-        G.degraus($('graficoLinhas'), dias, [
-            { chave: 'resolvidas', nome: 'Resolvidas', cor: 'var(--chart-1)' },
-            { chave: 'erros', nome: 'Erros', cor: 'var(--chart-2)' }
-        ], { vazio: 'Sem consultas no período.', formatar: F.formatarNumero });
+        // Destaque: redução de inadimplência
+        if (d.reducao_inadimplencia) {
+            const x = d.reducao_inadimplencia;
+            campo('reducao_inadimplencia', 'valor').textContent = F.formatarPct(x.taxa);
+            campo('reducao_inadimplencia', 'barra').style.width = (x.taxa === null || x.taxa === undefined ? 0 : Math.min(100, x.taxa * 100)) + '%';
+            campo('reducao_inadimplencia', 'apoio').textContent = x.baseDebito
+                ? `Recuperado ${F.formatarMoeda(x.recuperado)} de ${F.formatarMoeda(x.baseDebito)} em débito consultado`
+                : 'Sem débito consultado no período.';
+        }
 
-        // Erros por tela
-        $('listaErrosTela').innerHTML = d.errosPorTela.length
-            ? d.errosPorTela.map(e => `<tr><td class="ps-6 forte">${esc(e.tela)}</td><td class="num">${F.formatarNumero(e.qtd)}</td><td class="num pe-6 texto-suave">${F.formatarPct(e.pct)}</td></tr>`).join('')
-            : '<tr class="vazio-linha"><td colspan="3">Nenhum erro no período.</td></tr>';
-        $('cardErrosTela').classList.toggle('com-fade', d.errosPorTela.length > 3);
+        // Tempo humano
+        if (d.tempo_humano) {
+            const x = d.tempo_humano;
+            campo('tempo_humano', 'valor').textContent = F.formatarHoras(x.horasEconomizadas);
+            campo('tempo_humano', 'apoio').textContent = `${F.formatarPct(x.reducao)} menos tempo · ${F.formatarNumero(x.semHumano)} consultas sem atendimento`
+                + (x.estimado ? ' · tempo do robô estimado (sem consultas ao vivo)' : '');
+        }
 
-        // Saúde
-        const ruins = r.saude.filter(s => s.nivel !== 'verde');
-        $('saudeResumo').textContent = ruins.length ? `${ruins.length} ${ruins.length === 1 ? 'item precisa' : 'itens precisam'} da sua atenção.` : 'Nada urgente precisa da sua atenção.';
-        const ordenados = ruins.concat(r.saude.filter(s => s.nivel === 'verde'));
-        $('saude').innerHTML = ordenados.map(s => `<li><span class="nivel nivel-${esc(s.nivel)}" aria-label="${esc(s.nivel)}"></span><div class="saude-texto"><p class="saude-item">${esc(s.item)}</p><p class="saude-detalhe">${esc(s.detalhe)}</p></div></li>`).join('');
-        const tudoVerde = !ruins.length && !verSaudeDetalhe;
-        $('saudeVazio').hidden = !tudoVerde; $('saude').hidden = tudoVerde;
+        // Linha 3: funis
+        for (const chave of ['funil_debito', 'funil_amais', 'funil_antecipar']) {
+            const x = d[chave]; if (!x) continue;
+            const c = card(chave);
+            c.querySelector('[data-valor]').textContent = F.formatarNumero(x.agiram);
+            const pil = c.querySelector('[data-taxa]'), a = ant && ant[chave];
+            const v = a ? F.variacao(x.taxa, a.taxa, 'pontos') : null, t = v === null ? '' : tendencia(v, 'bom');
+            pil.className = 'pilula ' + (t ? 'pilula-' + t : 'pilula-marca');
+            pil.innerHTML = `<i class="ti ${v > 0 ? 'ti-arrow-up-right' : v < 0 ? 'ti-arrow-down-right' : 'ti-percentage'}" aria-hidden="true"></i><span>${F.formatarPct(x.taxa)}</span>`;
+            pil.title = 'Taxa de conversão' + (v === null ? '' : ` · ${v > 0 ? '+' : v < 0 ? '−' : ''}${F.formatarVariacao(v, 'pontos')} vs período anterior`);
+            c.querySelector('[data-apoio]').textContent = `de ${F.formatarNumero(x.base)} consultas`;
+            G.barrasPar(c.querySelector('[data-grafico]'), (x.dias || []).map(y => ({ rotulo: F.formatarDia(y.dia), titulo: F.formatarDia(y.dia), base: y.base, agiram: y.agiram })),
+                { corBase: 'var(--primary)', corAcao: '#9AA6D6', nomeBase: 'Consultaram', nomeAcao: 'Agiram', formatar: F.formatarNumero });
+        }
+
+        // Linha 4: financeiro
+        for (const chave of ['valor_recuperado', 'valor_antecipado']) {
+            const x = d[chave]; if (!x) continue;
+            const c = card(chave), a = ant && ant[chave];
+            c.querySelector('[data-valor]').textContent = F.formatarMoeda(x.valor);
+            const v = a ? F.variacao(x.valor, a.valor) : null, pil = c.querySelector('[data-delta]');
+            if (v === null) pil.hidden = true; else pintarPilula(pil, v, 'pct', 'bom');
+            c.querySelector('[data-apoio]').textContent = `${F.formatarNumero(x.qtdPagos)} ${x.qtdPagos === 1 ? 'boleto pago' : 'boletos pagos'} depois da cópia`;
+            const conf = c.querySelector('[data-conferencia]');
+            conf.textContent = x.qtdEmConferencia ? `+ ${F.formatarMoeda(x.emConferencia)} em conferência (${F.formatarNumero(x.qtdEmConferencia)})` : 'Nada em conferência';
+            conf.classList.toggle('vazia', !x.qtdEmConferencia);
+        }
+
+        // Linha 5: erros por tela
+        if (d.erros_por_tela) {
+            const antes = {}; ((ant && ant.erros_por_tela) || []).forEach(e => { antes[e.tela] = e.qtd; });
+            $('listaErrosTela').innerHTML = d.erros_por_tela.length
+                ? d.erros_por_tela.slice(0, 5).map(e => itemMetrica('ti-alert-circle', e.tela, `${F.formatarPct(e.pct)} dos erros`, F.formatarNumero(e.qtd),
+                    seta(e.qtd, ant ? (antes[e.tela] || 0) : null, 'ruim'))).join('')
+                : '<li class="vazio-item">Nenhum erro no período.</li>';
+        }
 
         // Origem das respostas
-        const origens = Object.entries(d.porOrigem).sort((a, b) => b[1] - a[1]);
-        const total = origens.reduce((s, [, v]) => s + v, 0);
-        $('listaOrigem').innerHTML = origens.length ? origens.slice(0, 4).map(([k, v]) => {
-            const o = ORIGENS[k] || { icone: 'ti-point', titulo: k, sub: '' };
-            return `<li><span class="atividade-icone" aria-hidden="true"><i class="ti ${o.icone}"></i></span>
-                <div class="atividade-texto"><p class="atividade-titulo">${esc(o.titulo)}</p><p class="atividade-sub">${esc(o.sub)}</p></div>
-                <span class="atividade-qtd" title="${F.formatarPct(v / total)} das consultas">${F.formatarNumero(v)}</span></li>`;
-        }).join('') : '<li class="vazio-item">Nenhuma consulta no período.</li>';
-        $('tempoMedio').textContent = `Tempo médio de resposta: ${F.formatarDuracao(d.tempoMedioMs)}`;
+        if (d.origem_respostas) {
+            const por = d.origem_respostas.porOrigem || {}, porAnt = ant && ant.origem_respostas ? (ant.origem_respostas.porOrigem || {}) : null;
+            const origens = Object.entries(por).sort((a, b) => b[1] - a[1]);
+            const total = origens.reduce((s, [, v]) => s + v, 0);
+            $('listaOrigem').innerHTML = origens.length ? origens.slice(0, 5).map(([k, v]) => {
+                const o = ORIGENS[k] || { icone: 'ti-point', titulo: k, sub: '', sentido: 'neutro' };
+                return itemMetrica(o.icone, o.titulo, `${F.formatarPct(total ? v / total : 0)} · ${o.sub}`, F.formatarNumero(v), seta(v, porAnt ? (porAnt[k] || 0) : null, o.sentido));
+            }).join('') : '<li class="vazio-item">Nenhuma consulta no período.</li>';
+            $('tempoMedio').textContent = `Tempo médio de resposta: ${F.formatarDuracao(d.origem_respostas.tempoMedioMs)}`;
+        }
+
+        // Saúde do sistema (os problemas primeiro)
+        const saude = Array.isArray(r.saude) ? r.saude : [];
+        if (permitidos.includes('saude_sistema')) {
+            const ruins = saude.filter(s => s.nivel !== 'verde');
+            $('saudeResumo').textContent = ruins.length ? `${ruins.length} ${ruins.length === 1 ? 'item precisa' : 'itens precisam'} da sua atenção.` : 'Nada urgente precisa da sua atenção.';
+            $('saude').innerHTML = saude.length ? ruins.concat(saude.filter(s => s.nivel === 'verde')).map(s => {
+                const n = NIVEIS[s.nivel] || NIVEIS.amarelo;
+                return `<li><i class="ti ${ICONES_SAUDE[s.item] || 'ti-activity'} metrica-icone" aria-hidden="true"></i>
+                    <div class="metrica-texto"><p class="metrica-rotulo">${esc(s.item)}</p><p class="metrica-sub" title="${esc(s.detalhe)}">${esc(s.detalhe)}</p></div>
+                    <span></span><span class="seta ${n.classe}" title="${n.nome}"><i class="ti ${n.icone}" aria-hidden="true"></i><span class="sr-only">${n.nome}</span></span></li>`;
+            }).join('') : '<li class="vazio-item">Sem informações de saúde.</li>';
+        }
 
         // Planilha e aviso do último export
         if (r.planilhaUrl) $$('[data-planilha]').forEach(a => { a.href = r.planilhaUrl; a.hidden = false; });
-        const exp = r.saude.find(s => s.item === 'Último export'), cache = r.saude.find(s => s.item === 'Idade do cache');
+        const exp = saude.find(s => s.item === 'Último export'), cache = saude.find(s => s.item === 'Idade do cache');
         if (exp && !exportFechado()) {
             $('ultimoExportTitulo').textContent = exp.nivel === 'verde' ? 'Export em dia' : 'Export precisa de atenção';
             $('ultimoExportDesc').textContent = exp.detalhe + (cache ? ` · cache de ${cache.detalhe}` : '');
@@ -246,6 +361,7 @@
         $('tabelaUsuarios').querySelector('tbody').innerHTML = usuarios.map(u => {
             const proprio = u.email === eu;
             const acoes = proprio ? '<span class="texto-suave">você</span>' : `<div class="acoes">
+                ${u.papel === 'super_admin' ? '' : `<button data-acao="kpis" data-email="${esc(u.email)}" title="${Array.isArray(u.kpis) ? 'Lista própria de KPIs' : 'Usa o padrão para novos membros'}">KPIs</button>`}
                 <button data-acao="papel" data-email="${esc(u.email)}">${u.papel === 'super_admin' ? 'Tornar membro' : 'Tornar super admin'}</button>
                 <button data-acao="ativo" data-email="${esc(u.email)}">${u.ativo ? 'Desativar' : 'Reativar'}</button>
                 <button data-acao="senha" data-email="${esc(u.email)}">Redefinir senha</button>
@@ -270,7 +386,9 @@
     $('tabelaUsuarios').addEventListener('click', async (e) => {
         const b = e.target.closest('button[data-acao]'); if (!b) return;
         const u = usuarios.find(x => x.email === b.dataset.email); if (!u) return;
-        if (b.dataset.acao === 'papel') {
+        if (b.dataset.acao === 'kpis') {
+            abrirKpis({ tipo: 'membro', usuario: u });
+        } else if (b.dataset.acao === 'papel') {
             const papel = u.papel === 'super_admin' ? 'membro' : 'super_admin';
             if (await confirmar(`${papel === 'super_admin' ? 'Tornar' : 'Rebaixar'} ${u.nome} ${papel === 'super_admin' ? 'super administrador' : 'para membro'}?`))
                 acaoUsuario('usuarios_atualizar', { email: u.email, papel }, 'Papel atualizado.');
@@ -303,6 +421,60 @@
         } catch (err) { $('uErro').textContent = err.message; $('uErro').hidden = false; }
     });
 
+    // ---------- KPIs visíveis (por membro e padrão para novos membros) ----------
+    const NOMES_GRUPO = { volume: 'Volume', conversao: 'Conversão', financeiro: 'Financeiro', eficiencia: 'Eficiência', operacao: 'Operação' };
+    let catalogo = null, kpisModo = null;
+    async function obterCatalogo() {
+        if (!catalogo) { const r = await API.chamar('eu'); catalogo = r.catalogo || []; }
+        return catalogo;
+    }
+    function montarKpis(lista, marcados) {
+        const grupos = {};
+        lista.forEach(k => (grupos[k.grupo] = grupos[k.grupo] || []).push(k));
+        const ordem = Object.keys(NOMES_GRUPO).filter(g => grupos[g]).concat(Object.keys(grupos).filter(g => !NOMES_GRUPO[g]));
+        $('kpisGrupos').innerHTML = ordem.map(g => `<fieldset><legend class="rotulo">${esc(NOMES_GRUPO[g] || g)}</legend><div class="opcoes">${
+            grupos[g].map(k => `<label><input type="checkbox" name="kpi" value="${esc(k.chave)}"${marcados.includes(k.chave) ? ' checked' : ''}>${esc(k.rotulo)}</label>`).join('')
+        }</div></fieldset>`).join('');
+    }
+    // modo: { tipo: 'membro', usuario } ou { tipo: 'padrao' }
+    async function abrirKpis(modo) {
+        try {
+            const cat = await obterCatalogo();
+            let marcados, desc;
+            if (modo.tipo === 'membro' && Array.isArray(modo.usuario.kpis)) {
+                marcados = modo.usuario.kpis;
+                desc = `O que ${modo.usuario.nome || modo.usuario.email} vê no dashboard.`;
+            } else {
+                const r = await API.chamar('kpis_padrao_ler');
+                if (r.catalogo && r.catalogo.length) catalogo = r.catalogo;
+                marcados = r.padrao || [];
+                desc = modo.tipo === 'padrao'
+                    ? 'O que os membros sem uma lista própria veem no dashboard.'
+                    : `${modo.usuario.nome || modo.usuario.email} usa hoje o padrão para novos membros. Ao salvar, passa a ter uma lista própria.`;
+            }
+            kpisModo = modo;
+            $('kpisTitulo').textContent = modo.tipo === 'padrao' ? 'Padrão para novos membros' : `KPIs de ${modo.usuario.nome || modo.usuario.email}`;
+            $('kpisDesc').textContent = desc;
+            $('kpisErro').hidden = true;
+            montarKpis(catalogo || cat, marcados);
+            $('dlgKpis').showModal();
+        } catch (err) { toast(err.message); }
+    }
+    $('btnKpisPadrao').addEventListener('click', () => abrirKpis({ tipo: 'padrao' }));
+    $('formKpis').addEventListener('submit', async (e) => {
+        e.preventDefault();
+        if (e.submitter && e.submitter.value === 'cancelar') { $('dlgKpis').close(); return; }
+        const lista = Array.from($('kpisGrupos').querySelectorAll('input[name="kpi"]:checked'), i => i.value);
+        $('kpisErro').hidden = true; $('btnSalvarKpis').disabled = true;
+        try {
+            if (kpisModo.tipo === 'padrao') await API.chamar('kpis_padrao_salvar', { padrao: lista });
+            else await API.chamar('usuarios_atualizar', { email: kpisModo.usuario.email, kpis: lista });
+            $('dlgKpis').close(); toast('KPIs atualizados.');
+            if (kpisModo.tipo === 'membro') carregarUsuarios();
+        } catch (err) { $('kpisErro').textContent = err.message; $('kpisErro').hidden = false; }
+        finally { $('btnSalvarKpis').disabled = false; }
+    });
+
     // ---------- Minha conta ----------
     $('formSenha').addEventListener('submit', async (e) => {
         e.preventDefault();
@@ -319,6 +491,6 @@
         const s = API.lerSessao();
         if (!s || !s.access_token) return mostrarLogin();
         API.agendarRefresh(s);
-        try { const r = await API.chamar('eu'); mostrarApp(r.usuario); } catch (e) { mostrarLogin(); }
+        try { const r = await API.chamar('eu'); catalogo = r.catalogo || null; mostrarApp(r.usuario); } catch (e) { mostrarLogin(); }
     })();
 })();

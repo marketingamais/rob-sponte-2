@@ -54,3 +54,12 @@ test('escalaMax: teto "redondo" para o eixo do grafico', () => {
     assert.strictEqual(F.escalaMax(37), 40);
     assert.strictEqual(F.escalaMax(230), 250);
 });
+test('formatarMoeda e formatarHoras', () => {
+    assert.strictEqual(F.formatarMoeda(1234.56).replace(/\s/g, ' '), 'R$ 1.234,56');
+    assert.strictEqual(F.formatarMoeda(0).replace(/\s/g, ' '), 'R$ 0,00');
+    assert.strictEqual(F.formatarMoeda(null), '—');
+    assert.strictEqual(F.formatarHoras(12.44), '12,4 h');
+    assert.strictEqual(F.formatarHoras(0.5), '30 min');
+    assert.strictEqual(F.formatarHoras(0), '0 min');
+    assert.strictEqual(F.formatarHoras(null), '—');
+});

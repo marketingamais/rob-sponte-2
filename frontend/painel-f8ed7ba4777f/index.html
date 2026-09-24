@@ -9,7 +9,7 @@
 
     <link rel="preconnect" href="https://fonts.googleapis.com">
     <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
-    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700&display=swap" rel="stylesheet">
+    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800&display=swap" rel="stylesheet">
     <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/@tabler/icons-webfont@3.48.0/dist/tabler-icons.min.css">
 
     <link rel="stylesheet" href="painel.css">
@@ -163,120 +163,145 @@
                     </div>
 
                     <p id="dashboardErro" class="alerta" hidden></p>
+                    <p id="dashboardVazio" class="aviso-vazio" hidden>Nenhum indicador liberado para você ainda. Fale com um super administrador.</p>
 
                     <div id="grade" class="grade">
-                        <!-- KPIs -->
-                        <article class="card stat" id="statConsultas">
-                            <header class="card-cab card-cab-linha">
-                                <h3 class="stat-titulo">Consultas</h3>
-                                <i class="ti ti-info-circle stat-info" aria-hidden="true" title="Total de consultas feitas no site no período."></i>
-                            </header>
-                            <div class="card-corpo"><p class="stat-valor" data-valor>—</p></div>
-                            <footer class="card-pe"><span class="delta" data-delta></span><span class="texto-suave" data-pe>vs período anterior</span></footer>
+                        <!-- Linha 1: KPIs de volume -->
+                        <article class="kpi-card" data-kpi="consultas_total" data-linha="1" data-sentido="bom" title="Total de consultas feitas no site no período, inclusive as que terminaram em erro.">
+                            <div class="kpi-topo"><p class="rotulo">Consultas</p><span class="pilula" data-delta hidden></span></div>
+                            <p class="valor-grande" data-valor>—</p>
+                            <p class="kpi-pe" data-pe>vs período anterior</p>
                         </article>
-                        <article class="card stat" id="statDebito">
-                            <header class="card-cab card-cab-linha">
-                                <h3 class="stat-titulo">Com débito</h3>
-                                <i class="ti ti-info-circle stat-info" aria-hidden="true" title="Consultas que devolveram linha digitável de parcela vencida."></i>
-                            </header>
-                            <div class="card-corpo"><p class="stat-valor" data-valor>—</p></div>
-                            <footer class="card-pe"><span class="delta" data-delta></span><span class="texto-suave" data-pe>vs período anterior</span></footer>
+                        <article class="kpi-card" data-kpi="consultas_em_dia" data-linha="1" data-sentido="bom" title="Consultas de famílias sem parcela vencida.">
+                            <div class="kpi-topo"><p class="rotulo">Em dia</p><span class="pilula" data-delta hidden></span></div>
+                            <p class="valor-grande" data-valor>—</p>
+                            <p class="kpi-pe" data-pe>vs período anterior</p>
                         </article>
-                        <article class="card stat" id="statEncaminhamentos">
-                            <header class="card-cab card-cab-linha">
-                                <h3 class="stat-titulo">Encaminhamentos</h3>
-                                <i class="ti ti-info-circle stat-info" aria-hidden="true" title="Famílias com mais de 5 dias de atraso, encaminhadas para a Amais."></i>
-                            </header>
-                            <div class="card-corpo"><p class="stat-valor" data-valor>—</p></div>
-                            <footer class="card-pe"><span class="delta" data-delta></span><span class="texto-suave" data-pe>vs período anterior</span></footer>
+                        <article class="kpi-card" data-kpi="consultas_debito" data-linha="1" data-sentido="neutro" title="Consultas que encontraram parcela vencida.">
+                            <div class="kpi-topo"><p class="rotulo">Com débito</p><span class="pilula" data-delta hidden></span></div>
+                            <p class="valor-grande" data-valor>—</p>
+                            <p class="kpi-pe" data-pe>vs período anterior</p>
                         </article>
-                        <article class="card stat" id="statResolucao">
-                            <header class="card-cab card-cab-linha">
-                                <h3 class="stat-titulo">Taxa de resolução</h3>
-                                <i class="ti ti-info-circle stat-info" id="dicaResolucao" aria-hidden="true" title="Consultas que não terminaram em pop-up de erro."></i>
-                            </header>
-                            <div class="card-corpo"><p class="stat-valor" data-valor>—</p></div>
-                            <footer class="card-pe"><span class="delta" data-delta></span><span class="texto-suave" data-pe>vs período anterior</span></footer>
+                        <article class="kpi-card" data-kpi="encaminhamentos" data-linha="1" data-sentido="neutro" title="Famílias com mais de 5 dias de atraso, encaminhadas para a Amais.">
+                            <div class="kpi-topo"><p class="rotulo">Encaminhamentos</p><span class="pilula" data-delta hidden></span></div>
+                            <p class="valor-grande" data-valor>—</p>
+                            <p class="kpi-pe" data-pe>vs período anterior</p>
                         </article>
 
-                        <!-- Consultas por dia (barras) -->
-                        <article class="card card-sem-gap span-2">
-                            <header class="card-cab">
-                                <div class="titulo-com-selo">
-                                    <h3 class="card-titulo">Consultas por dia</h3>
-                                    <span id="seloConsultas" class="delta delta-selo" hidden></span>
+                        <!-- Linha 2: comparativo diário + destaque + tempo humano -->
+                        <article class="card-v2 card-comparativo" data-kpi="comparativo_diario" data-linha="2">
+                            <header class="card-v2-cab">
+                                <div class="card-v2-titulos">
+                                    <p class="rotulo">Comparativo diário</p>
+                                    <h3 class="card-v2-titulo">Consultas por dia e resultado</h3>
                                 </div>
-                                <p class="card-desc">Total de consultas por dia no período.</p>
+                                <ul class="legenda-quadros" aria-label="Legenda">
+                                    <li><span class="quadro" style="background:var(--primary)"></span>Consultas</li>
+                                    <li><span class="quadro" style="background:var(--serie-em-dia)"></span>Em dia</li>
+                                    <li><span class="quadro" style="background:var(--serie-debito)"></span>Com débito</li>
+                                    <li><span class="quadro" style="background:var(--serie-encaminhados)"></span>Encaminhados</li>
+                                </ul>
                             </header>
-                            <div class="card-corpo">
-                                <div id="graficoBarras" class="grafico" role="img" aria-label="Gráfico de consultas por dia"></div>
+                            <div id="graficoComparativo" class="grafico grafico-area" role="img" aria-label="Gráfico de área com consultas, em dia, com débito e encaminhados por dia"></div>
+                        </article>
+
+                        <article class="card-destaque" data-kpi="reducao_inadimplencia" data-linha="2" title="Valor pago depois de copiar a linha digitável, dividido pelo débito das consultas do período.">
+                            <p class="rotulo">Financeiro</p>
+                            <h3 class="destaque-titulo">Redução de inadimplência</h3>
+                            <p class="valor-destaque" data-valor>—</p>
+                            <div class="progresso" aria-hidden="true"><span data-barra></span></div>
+                            <p class="destaque-apoio" data-apoio></p>
+                        </article>
+
+                        <article class="card-v2 card-compacto" data-kpi="tempo_humano" data-linha="2" title="Tempo que a equipe gastaria atendendo essas consultas (2 × o tempo do robô) e quanto o site reduziu.">
+                            <header class="card-icone-cab">
+                                <span class="icone-card" aria-hidden="true"><i class="ti ti-clock-hour-4"></i></span>
+                                <div class="card-v2-titulos"><p class="rotulo">Eficiência</p><h3 class="card-v2-titulo">Tempo humano economizado</h3></div>
+                            </header>
+                            <p class="valor-grande" data-valor>—</p>
+                            <p class="texto-apoio" data-apoio></p>
+                        </article>
+
+                        <!-- Linha 3: funis de conversão -->
+                        <article class="card-v2 card-funil" data-kpi="funil_debito" data-linha="3">
+                            <header class="card-icone-cab">
+                                <span class="icone-card" aria-hidden="true"><i class="ti ti-copy"></i></span>
+                                <div class="card-v2-titulos"><p class="rotulo">Com débito</p><h3 class="card-v2-titulo">Copiaram a linha digitável</h3></div>
+                            </header>
+                            <div class="funil-numeros"><p class="valor-xl" data-valor>—</p><span class="pilula" data-taxa></span></div>
+                            <p class="texto-apoio" data-apoio></p>
+                            <div class="grafico barras-par" data-grafico role="img" aria-label="Barras por dia: consultas com débito e quem copiou a linha"></div>
+                            <ul class="legenda-quadros legenda-mini" aria-hidden="true"><li><span class="quadro quadro-base"></span>Consultaram</li><li><span class="quadro quadro-acao"></span>Agiram</li></ul>
+                        </article>
+                        <article class="card-v2 card-funil" data-kpi="funil_amais" data-linha="3">
+                            <header class="card-icone-cab">
+                                <span class="icone-card" aria-hidden="true"><i class="ti ti-brand-whatsapp"></i></span>
+                                <div class="card-v2-titulos"><p class="rotulo">Encaminhados</p><h3 class="card-v2-titulo">Falaram com a Amais</h3></div>
+                            </header>
+                            <div class="funil-numeros"><p class="valor-xl" data-valor>—</p><span class="pilula" data-taxa></span></div>
+                            <p class="texto-apoio" data-apoio></p>
+                            <div class="grafico barras-par" data-grafico role="img" aria-label="Barras por dia: encaminhados e quem falou com a Amais"></div>
+                            <ul class="legenda-quadros legenda-mini" aria-hidden="true"><li><span class="quadro quadro-base"></span>Consultaram</li><li><span class="quadro quadro-acao"></span>Agiram</li></ul>
+                        </article>
+                        <article class="card-v2 card-funil" data-kpi="funil_antecipar" data-linha="3">
+                            <header class="card-icone-cab">
+                                <span class="icone-card" aria-hidden="true"><i class="ti ti-calendar-dollar"></i></span>
+                                <div class="card-v2-titulos"><p class="rotulo">Em dia</p><h3 class="card-v2-titulo">Anteciparam a parcela</h3></div>
+                            </header>
+                            <div class="funil-numeros"><p class="valor-xl" data-valor>—</p><span class="pilula" data-taxa></span></div>
+                            <p class="texto-apoio" data-apoio></p>
+                            <div class="grafico barras-par" data-grafico role="img" aria-label="Barras por dia: consultas em dia e quem antecipou"></div>
+                            <ul class="legenda-quadros legenda-mini" aria-hidden="true"><li><span class="quadro quadro-base"></span>Consultaram</li><li><span class="quadro quadro-acao"></span>Agiram</li></ul>
+                        </article>
+
+                        <!-- Linha 4: financeiro -->
+                        <article class="card-v2 card-valor" data-kpi="valor_recuperado" data-linha="4" title="Boletos em débito pagos depois que a família copiou a linha digitável no site.">
+                            <header class="card-icone-cab">
+                                <span class="icone-card" aria-hidden="true"><i class="ti ti-cash"></i></span>
+                                <div class="card-v2-titulos"><p class="rotulo">Financeiro</p><h3 class="card-v2-titulo">Valor recuperado</h3></div>
+                                <span class="pilula" data-delta hidden></span>
+                            </header>
+                            <p class="valor-xl" data-valor>—</p>
+                            <div class="valor-rodape">
+                                <p class="texto-apoio" data-apoio></p>
+                                <p class="linha-conferencia" data-conferencia></p>
+                            </div>
+                        </article>
+                        <article class="card-v2 card-valor" data-kpi="valor_antecipado" data-linha="4" title="Parcelas em dia pagas antes do vencimento depois que a família copiou a linha no site.">
+                            <header class="card-icone-cab">
+                                <span class="icone-card" aria-hidden="true"><i class="ti ti-calendar-up"></i></span>
+                                <div class="card-v2-titulos"><p class="rotulo">Financeiro</p><h3 class="card-v2-titulo">Valor antecipado</h3></div>
+                                <span class="pilula" data-delta hidden></span>
+                            </header>
+                            <p class="valor-xl" data-valor>—</p>
+                            <div class="valor-rodape">
+                                <p class="texto-apoio" data-apoio></p>
+                                <p class="linha-conferencia" data-conferencia></p>
                             </div>
                         </article>
 
-                        <!-- Resolvidas e erros (linhas em degrau) -->
-                        <article class="card card-sem-gap span-2">
-                            <header class="card-cab">
-                                <div class="titulo-com-selo">
-                                    <h3 class="card-titulo">Resolvidas e erros</h3>
-                                    <span id="seloErros" class="delta delta-selo" hidden></span>
-                                </div>
-                                <p class="card-desc">
-                                    <span class="legenda"><span class="legenda-cor cor-resolvidas"></span>Resolvidas</span>
-                                    <span class="legenda"><span class="legenda-cor cor-erros"></span>Erros</span>
-                                    <span id="taxaErrosTexto"></span>
-                                </p>
+                        <!-- Linha 5: operação -->
+                        <article class="card-v2 card-lista" data-kpi="erros_por_tela" data-linha="5">
+                            <header class="card-v2-cab">
+                                <div class="card-v2-titulos"><p class="rotulo">Operação</p><h3 class="card-v2-titulo">Erros por tela</h3></div>
                             </header>
-                            <div class="card-corpo">
-                                <div id="graficoLinhas" class="grafico" role="img" aria-label="Gráfico de consultas resolvidas e com erro por dia"></div>
-                            </div>
+                            <p class="texto-apoio">Onde as pessoas pararam no período.</p>
+                            <ul id="listaErrosTela" class="lista-metricas"></ul>
+                            <a class="link-card" href="#" target="_blank" rel="noopener" data-planilha hidden>Abrir planilha de erros <i class="ti ti-arrow-up-right" aria-hidden="true"></i></a>
                         </article>
-
-                        <!-- Erros por tela (tabela) -->
-                        <article id="cardErrosTela" class="card card-sem-gap span-2 card-tabela">
-                            <header class="card-cab com-borda">
-                                <h3 class="card-titulo card-titulo-base">Erros por tela</h3>
-                                <p class="card-desc">Onde as pessoas pararam no período.</p>
+                        <article class="card-v2 card-lista" data-kpi="origem_respostas" data-linha="5">
+                            <header class="card-v2-cab">
+                                <div class="card-v2-titulos"><p class="rotulo">Operação</p><h3 class="card-v2-titulo">Origem das respostas</h3></div>
                             </header>
-                            <div class="card-corpo sem-lateral">
-                                <table class="tabela">
-                                    <caption class="sr-only">Erros por tela com quantidade e percentual.</caption>
-                                    <thead><tr><th class="ps-6">Tela</th><th class="num">Qtd</th><th class="num pe-6">% dos erros</th></tr></thead>
-                                    <tbody id="listaErrosTela"></tbody>
-                                </table>
-                            </div>
-                            <div class="tabela-rodape">
-                                <a class="btn btn-fantasma" href="#" target="_blank" rel="noopener" data-planilha hidden>
-                                    Abrir planilha de erros <i class="ti ti-arrow-right" aria-hidden="true"></i>
-                                </a>
-                            </div>
+                            <p id="tempoMedio" class="texto-apoio">Tempo médio de resposta: —</p>
+                            <ul id="listaOrigem" class="lista-metricas"></ul>
                         </article>
-
-                        <!-- Saude do sistema -->
-                        <article class="card card-sem-gap">
-                            <header class="card-cab com-borda">
-                                <h3 class="card-titulo card-titulo-base">Saúde do sistema</h3>
-                                <p id="saudeResumo" class="card-desc">Verificando…</p>
+                        <article class="card-v2 card-lista" data-kpi="saude_sistema" data-linha="5">
+                            <header class="card-v2-cab">
+                                <div class="card-v2-titulos"><p class="rotulo">Operação</p><h3 class="card-v2-titulo">Saúde do sistema</h3></div>
                             </header>
-                            <div class="card-corpo sem-lateral card-corpo-cheio">
-                                <div id="saudeVazio" class="vazio" hidden>
-                                    <span class="vazio-midia"><i class="ti ti-circle-check" aria-hidden="true"></i></span>
-                                    <p class="vazio-titulo">Tudo certo por aqui.</p>
-                                    <p class="vazio-desc">Robô, export, cache e erros dentro do esperado.</p>
-                                    <button type="button" id="btnVerSaude" class="btn btn-fantasma">Ver detalhes <i class="ti ti-arrow-right" aria-hidden="true"></i></button>
-                                </div>
-                                <ul id="saude" class="lista-saude"></ul>
-                            </div>
-                        </article>
-
-                        <!-- Origem das respostas -->
-                        <article class="card card-sem-gap">
-                            <header class="card-cab com-borda">
-                                <h3 class="card-titulo">Origem das respostas</h3>
-                                <p id="tempoMedio" class="card-desc">Tempo médio de resposta: —</p>
-                            </header>
-                            <div class="card-corpo sem-lateral">
-                                <ul id="listaOrigem" class="lista-atividade"></ul>
-                            </div>
+                            <p id="saudeResumo" class="texto-apoio">Verificando…</p>
+                            <ul id="saude" class="lista-metricas"></ul>
                         </article>
                     </div>
                 </section>
@@ -288,9 +313,14 @@
                             <h1 class="pagina-titulo">Usuários</h1>
                             <p class="pagina-desc">Quem pode acessar este painel.</p>
                         </div>
-                        <button type="button" id="btnNovoUsuario" class="btn btn-primario">
-                            <i class="ti ti-plus" aria-hidden="true"></i> Novo usuário
-                        </button>
+                        <div class="cabecalho-acoes">
+                            <button type="button" id="btnKpisPadrao" class="btn btn-contorno">
+                                <i class="ti ti-adjustments-horizontal" aria-hidden="true"></i> Padrão para novos membros
+                            </button>
+                            <button type="button" id="btnNovoUsuario" class="btn btn-primario">
+                                <i class="ti ti-plus" aria-hidden="true"></i> Novo usuário
+                            </button>
+                        </div>
                     </div>
 
                     <p id="usuariosErro" class="alerta" hidden></p>
@@ -321,7 +351,7 @@
                             <p class="pagina-desc">Seus dados de acesso ao painel.</p>
                         </div>
                     </div>
-                    <div class="grade grade-conta">
+                    <div class="grade-conta">
                         <article class="card">
                             <header class="card-cab">
                                 <h3 class="card-titulo">Perfil</h3>
@@ -401,6 +431,21 @@
             <div class="dialogo-acoes">
                 <button type="submit" value="cancelar" formnovalidate class="btn btn-contorno">Cancelar</button>
                 <button type="submit" value="salvar" class="btn btn-primario">Salvar</button>
+            </div>
+        </form>
+    </dialog>
+
+    <dialog id="dlgKpis" class="dialogo dialogo-kpis">
+        <form id="formKpis" method="dialog" class="form">
+            <div class="dialogo-cab">
+                <h2 id="kpisTitulo">KPIs visíveis</h2>
+                <p id="kpisDesc" class="card-desc"></p>
+            </div>
+            <div id="kpisGrupos" class="kpis-grupos"></div>
+            <p id="kpisErro" class="erro" hidden></p>
+            <div class="dialogo-acoes">
+                <button type="submit" value="cancelar" formnovalidate class="btn btn-contorno">Cancelar</button>
+                <button type="submit" value="salvar" id="btnSalvarKpis" class="btn btn-primario">Salvar</button>
             </div>
         </form>
     </dialog>

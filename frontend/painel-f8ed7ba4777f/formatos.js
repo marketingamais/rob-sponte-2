@@ -45,6 +45,16 @@
         for (const m of [1, 2, 2.5, 4, 5, 8, 10]) if (m * pot >= max) return m * pot;
         return 10 * pot;
     }
+    function formatarMoeda(n) {
+        if (n === null || n === undefined || Number.isNaN(Number(n))) return '—';
+        return new Intl.NumberFormat('pt-BR', { style: 'currency', currency: 'BRL' }).format(Number(n));
+    }
+    // Horas com 1 casa; abaixo de 1 h mostra em minutos
+    function formatarHoras(h) {
+        if (h === null || h === undefined || Number.isNaN(Number(h))) return '—';
+        if (h < 1) return Math.round(h * 60) + ' min';
+        return new Intl.NumberFormat('pt-BR', { maximumFractionDigits: 1 }).format(h) + ' h';
+    }
     function gerarSenha() {
         const A = 'ABCDEFGHJKLMNPQRSTUVWXYZabcdefghijkmnpqrstuvwxyz23456789';
         const c = (typeof crypto !== 'undefined' && crypto.getRandomValues) ? crypto : require('crypto').webcrypto;
@@ -52,6 +62,6 @@
         return Array.from(b, x => A[x % A.length]).join('');
     }
     const api = { formatarNumero, formatarPct, formatarDuracao, formatarDia, periodoPreset, gerarSenha,
-        periodoAnterior, variacao, formatarVariacao, escalaMax };
+        periodoAnterior, variacao, formatarVariacao, escalaMax, formatarMoeda, formatarHoras };
     if (typeof module !== 'undefined' && module.exports) module.exports = api; else raiz.Formatos = api;
 })(typeof window !== 'undefined' ? window : globalThis);

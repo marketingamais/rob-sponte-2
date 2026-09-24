@@ -159,5 +159,121 @@
         });
     }
 
-    raiz.Graficos = { barras, degraus };
+    // Área suave com várias séries (painel v2).
+    // dias: [{ rotulo, titulo, valores: { chave: n } }]; series: [{ chave, nome, cor }]
+    function areas(alvo, dias, seriesBrutas, opcoes) {
+        const o = Object.assign({ vazio: 'Sem dados no período.', formatar: String }, opcoes);
+        montar(alvo, () => {
+            const series = seriesBrutas.map(s => Object.assign({}, s, { cor: cor(alvo, s.cor) }));
+            const { svg, dica, W, H } = base(alvo);
+            const esq = 12, dir = 12, topo = 8, baixo = 28;
+            const plotW = W - esq - dir, plotH = H - topo - baixo;
+            const n = dias.length;
+            const val = (d, s) => Number(d.valores[s.chave]) || 0;
+            const todos = dias.flatMap(d => series.map(s => val(d, s)));
+            const max = raiz.Formatos.escalaMax(Math.max(0, ...todos));
+            const xDe = i => n <= 1 ? esq + plotW / 2 : esq + (i * plotW) / (n - 1);
+            const yDe = v => topo + plotH - (max ? (v / max) * plotH : 0);
+            const baseY = topo + plotH;
+
+            // 5 linhas de grade horizontais
+            const grade = el('g', { class: 'grade-y' }, svg);
+            for (let k = 0; k <= 4; k++) {
+                const y = topo + (plotH * k) / 4;
+                el('line', { x1: esq, x2: esq + plotW, y1: y, y2: y }, grade);
+            }
+
+            const defs = el('defs', {}, svg);
+            const camadas = el('g', {}, svg);
+            // A série de maior soma vai atrás, para as menores ficarem visíveis por cima
+            const soma = s => dias.reduce((t, d) => t + val(d, s), 0);
+            const ordem = series.slice().sort((a, b) => soma(b) - soma(a));
+            for (const s of ordem) {
+                const pts = n === 1
+                    ? [{ x: esq, y: yDe(val(dias[0], s)) }, { x: esq + plotW, y: yDe(val(dias[0], s)) }]
+                    : dias.map((d, i) => ({ x: xDe(i), y: yDe(val(d, s)) }));
+                if (!pts.length) continue;
+                // Curva suave: controles nos terços horizontais, com o y dos extremos
+                let linha = `M${pts[0].x},${pts[0].y}`;
+                for (let i = 1; i < pts.length; i++) {
+                    const a = pts[i - 1], b = pts[i];
+                    const cx1 = a.x + (b.x - a.x) / 3, cx2 = b.x - (b.x - a.x) / 3;
+                    linha += `C${cx1},${a.y} ${cx2},${b.y} ${b.x},${b.y}`;
+                }
+                const gid = 'grad-area-' + (++seq);
+                const lg = el('linearGradient', { id: gid, x1: 0, x2: 0, y1: 0, y2: 1 }, defs);
+                el('stop', { offset: '0%', 'stop-color': s.cor, 'stop-opacity': 0.35 }, lg);
+                el('stop', { offset: '100%', 'stop-color': s.cor, 'stop-opacity': 0 }, lg);
+                const ult = pts[pts.length - 1];
+                el('path', { d: `${linha}L${ult.x},${baseY}L${pts[0].x},${baseY}Z`, fill: `url(#${gid})` }, camadas);
+                el('path', { d: linha, fill: 'none', stroke: s.cor, 'stroke-width': 2, 'stroke-linejoin': 'round', 'stroke-linecap': 'round' }, camadas);
+            }
+
+            // Valor de cada linha de grade, à direita e acima dela (com halo da cor do card)
+            const rotY = el('g', { class: 'eixo-y' }, svg);
+            for (let k = 0; k < 4; k++) {
+                const t = el('text', { x: esq + plotW, y: topo + (plotH * k) / 4 - 4, 'text-anchor': 'end' }, rotY);
+                t.textContent = raiz.Formatos.formatarNumero(max - (max * k) / 4);
+            }
+
+            rotulosX(svg, dias.map((p, i) => ({ x: xDe(i), rotulo: p.rotulo })), baseY + 8 + 12, 44);
+
+            // Guia vertical + pontos do dia sob o mouse
+            const guia = el('g', { class: 'guia', visibility: 'hidden' }, svg);
+            const guiaLinha = el('line', { y1: topo, y2: baseY }, guia);
+            const marcas = series.map(s => el('circle', { r: 3.5, fill: s.cor }, guia));
+            const passo = n > 1 ? plotW / (n - 1) : plotW;
+            dias.forEach((p, i) => {
+                const x0 = n > 1 ? xDe(i) - passo / 2 : esq;
+                const a = el('rect', { class: 'alvo', x: Math.max(0, x0), y: topo, width: passo, height: plotH }, svg);
+                a.addEventListener('mousemove', ev => {
+                    const x = xDe(i);
+                    guiaLinha.setAttribute('x1', x); guiaLinha.setAttribute('x2', x);
+                    series.forEach((s, j) => { marcas[j].setAttribute('cx', x); marcas[j].setAttribute('cy', yDe(val(p, s))); });
+                    guia.setAttribute('visibility', 'visible');
+                    mostrarDica(alvo, dica, ev, p.titulo || p.rotulo, series.map(s => ({ cor: s.cor, nome: s.nome, valor: o.formatar(val(p, s)) })));
+                });
+                a.addEventListener('mouseleave', () => { dica.hidden = true; guia.setAttribute('visibility', 'hidden'); });
+            });
+            if (!todos.some(v => v > 0)) vazio(alvo, o.vazio);
+        });
+    }
+
+    // Barras em par por dia (painel v2): escura = base, clara = quem agiu, na mesma escala.
+    // dias: [{ rotulo, titulo, base, agiram }]
+    function barrasPar(alvo, dias, opcoesBrutas) {
+        const o = Object.assign({ nomeBase: 'Consultaram', nomeAcao: 'Agiram', vazio: 'Sem consultas no período.', formatar: String }, opcoesBrutas);
+        montar(alvo, () => {
+            const corBase = cor(alvo, o.corBase), corAcao = cor(alvo, o.corAcao);
+            const { svg, dica, W, H } = base(alvo);
+            const topo = 4, baixo = 22, plotH = H - topo - baixo;
+            const n = dias.length || 1, faixa = W / n;
+            // Par = 70% da faixa; em cards muito largos cada barra para em 32 px
+            const vao = Math.min(3, faixa * 0.7 * 0.08), larg = Math.max(1, Math.min(32, (faixa * 0.7 - vao) / 2)), par = larg * 2 + vao;
+            const max = raiz.Formatos.escalaMax(Math.max(0, ...dias.map(d => Number(d.base) || 0)));
+            const baseY = topo + plotH;
+            el('line', { class: 'linha-base', x1: 0, x2: W, y1: baseY + 0.5, y2: baseY + 0.5 }, svg);
+            const g = el('g', {}, svg);
+            const barra = (x, v, c) => {
+                const h = max ? Math.min(1, (Number(v) || 0) / max) * plotH : 0;
+                if (h > 0) el('rect', { x, y: baseY - h, width: larg, height: h, rx: Math.min(3, larg / 2), fill: c }, g);
+            };
+            const pontos = [];
+            dias.forEach((d, i) => {
+                const cx = i * faixa + faixa / 2, x0 = cx - par / 2;
+                barra(x0, d.base, corBase);
+                barra(x0 + larg + vao, d.agiram, corAcao);
+                pontos.push({ x: cx, rotulo: d.rotulo });
+                const a = el('rect', { class: 'alvo', x: i * faixa, y: topo, width: faixa, height: plotH }, svg);
+                a.addEventListener('mousemove', ev => mostrarDica(alvo, dica, ev, d.titulo || d.rotulo, [
+                    { cor: corBase, nome: o.nomeBase, valor: o.formatar(Number(d.base) || 0) },
+                    { cor: corAcao, nome: o.nomeAcao, valor: o.formatar(Number(d.agiram) || 0) }]));
+                a.addEventListener('mouseleave', () => { dica.hidden = true; });
+            });
+            rotulosX(svg, pontos, baseY + 16, 40);
+            if (!dias.some(d => Number(d.base) > 0)) vazio(alvo, o.vazio);
+        });
+    }
+
+    raiz.Graficos = { barras, degraus, areas, barrasPar };
 })(window);
