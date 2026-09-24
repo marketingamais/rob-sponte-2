@@ -119,7 +119,9 @@ async function handleFormSubmit(e) {
         document.getElementById('cpfError').classList.remove('hidden');
         return;
     }
-    
+
+    consultaAtual = { id: novoConsultaId(), cpf };
+
     // Abre o loading
     openModal('modalLoading');
     startLoadingAnimation();
@@ -142,7 +144,7 @@ async function handleFormSubmit(e) {
                     response = await fetch(webhookUrl, {
                         method: 'POST',
                         headers: { 'Content-Type': 'application/json' },
-                        body: JSON.stringify({ cpf }),
+                        body: JSON.stringify({ cpf, consulta_id: consultaAtual.id }),
                         signal: ctrl.signal
                     });
                 } finally {
@@ -211,6 +213,20 @@ function registrarEventoErro(code, cpf, duracaoMs) {
     } catch (e) { /* nunca atrapalha o site */ }
 }
 
+// Estado da consulta atual (para os eventos de acao do painel)
+let consultaAtual = { id: '', cpf: '' };
+let modoLinhaAtual = 'debito';
+let parcelaAtual = null; // { linha, numParcela, dataVencimento, valor }
+function novoConsultaId() {
+    try { return crypto.randomUUID(); } catch (e) { return ''; }
+}
+function registrarAcao(tipo, extra) {
+    if (!consultaAtual.id) return;
+    const corpo = JSON.stringify(Object.assign({ tipo, consulta_id: consultaAtual.id }, extra || {}));
+    try { if (navigator.sendBeacon && navigator.sendBeacon(URL_EVENTO, corpo)) return; } catch (e) {}
+    try { fetch(URL_EVENTO, { method: 'POST', body: corpo, keepalive: true }); } catch (e) {}
+}
+
 // Primeiro + ultimo nome (ex.: "Maria Aparecida da Silva" -> "Maria Silva")
 function formatNome(nome) {
     if (!nome) return '';
@@ -240,7 +256,7 @@ function boletoCardHTML(b, atrasada) {
         ? `<p class="venc-atraso">Venceu em ${b.dataVencimento}${valor ? ' &bull; ' + valor : ''}</p>`
         : `<p class="venc-ok">Vence em ${b.dataVencimento}${valor ? ' &bull; ' + valor : ''}</p>`;
     const acao = b.linhaDigitavel
-        ? `<button class="btn-whatsapp pill-shape btn-pagar" onclick="showLinhaDigitavel('${b.linhaDigitavel}', '${b.numParcela}', '${b.dataVencimento}')">Pagar</button>`
+        ? `<button class="btn-whatsapp pill-shape btn-pagar" onclick="showLinhaDigitavel('${b.linhaDigitavel}', '${b.numParcela}', '${b.dataVencimento}', '${b.valor || ''}', 'debito')">Pagar</button>`
         : `<span class="boleto-indisponivel">Boleto ainda não liberado</span>`;
     return `
         <div class="boleto-card ${atrasada ? '' : 'ok'}">
@@ -280,7 +296,7 @@ function renderAlunosScreen(nomeResp, alunos) {
             corpo = `
                 <div class="aluno-aviso">
                     <p>Mais de 5 dias de atraso. Entre em contato com a Amais para regularizar os débitos deste aluno.</p>
-                    <a href="${WA_NEGOCIAR}" target="_blank" class="btn-whatsapp pill-shape">
+                    <a href="${WA_NEGOCIAR}" target="_blank" class="btn-whatsapp pill-shape" onclick="registrarAcao('clicou_amais')">
                         <i class="ti ti-brand-whatsapp"></i> Falar com a Amais
                     </a>
                 </div>`;
@@ -385,10 +401,13 @@ function handleLegacy(data) {
                 btnProximo.style.opacity = '1';
                 btnProximo.style.cursor = 'pointer';
                 btnProximo.onclick = () => {
+                    registrarAcao('clicou_antecipar');
                     showLinhaDigitavel(
-                        currentProximoBoleto.linhaDigitavel, 
-                        currentProximoBoleto.numParcela, 
-                        currentProximoBoleto.dataVencimento
+                        currentProximoBoleto.linhaDigitavel,
+                        currentProximoBoleto.numParcela,
+                        currentProximoBoleto.dataVencimento,
+                        currentProximoBoleto.valor,
+                        'antecipacao'
                     );
                 };
             } else {
@@ -436,7 +455,7 @@ function renderBoletosList(parcelas) {
                 <p>Venceu em: ${p.dataVencimento}</p>
             </div>
             ${p.linhaDigitavel ? `
-            <button class="btn-whatsapp pill-shape" style="padding: 0.75rem 1.5rem; font-size: 0.875rem;" onclick="showLinhaDigitavel('${p.linhaDigitavel}', '${p.numParcela}', '${p.dataVencimento}')">
+            <button class="btn-whatsapp pill-shape" style="padding: 0.75rem 1.5rem; font-size: 0.875rem;" onclick="showLinhaDigitavel('${p.linhaDigitavel}', '${p.numParcela}', '${p.dataVencimento}', '${p.valor || ''}', 'debito')">
                 Pagar
             </button>
             ` : `
@@ -470,10 +489,13 @@ function closeBoletosScreen() {
     document.getElementById('telaBoletos').classList.add('hidden');
 }
 
-function showLinhaDigitavel(linha, numParcela = null, dataVencimento = null) {
+function showLinhaDigitavel(linha, numParcela = null, dataVencimento = null, valor = null, modo = 'debito') {
+    parcelaAtual = { linha, numParcela, dataVencimento, valor };
+    modoLinhaAtual = modo || 'debito';
+
     document.getElementById('linhaTexto').innerText = linha;
     document.getElementById('copyFeedback').classList.add('hidden');
-    
+
     const infoDiv = document.getElementById('infoProximoBoleto');
     if (numParcela && dataVencimento) {
         document.getElementById('numParcelaProximo').innerText = numParcela;
@@ -489,9 +511,12 @@ function showLinhaDigitavel(linha, numParcela = null, dataVencimento = null) {
 function copyLinhaDigitavel() {
     const texto = document.getElementById('linhaTexto').innerText;
     navigator.clipboard.writeText(texto).then(() => {
+        if (parcelaAtual) registrarAcao('copiou_linha', { cpf: consultaAtual.cpf, modo: modoLinhaAtual, num_parcela: parcelaAtual.numParcela,
+            vencimento: parcelaAtual.dataVencimento, valor: parcelaAtual.valor, linha: parcelaAtual.linha });
+
         const feedback = document.getElementById('copyFeedback');
         feedback.classList.remove('hidden');
-        
+
         const box = document.querySelector('.linha-digitavel-box');
         if (box) {
             box.classList.remove('glow-green');
