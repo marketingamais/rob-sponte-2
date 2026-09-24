@@ -189,6 +189,7 @@ async function handleFormSubmit(e) {
         cleanupGame();
 
         // Se falhar por timeout ou erro do servidor, mostra o modal de tentar novamente com mensagem genérica
+        document.getElementById('tituloTimeout').innerText = "Sistema Lento";
         document.getElementById('textoTimeout').innerText = "Desculpe! O sistema está com uma alta demanda ou demorando muito para responder no momento. Por favor, tente novamente!";
         openModal('modalTimeout');
     }
@@ -343,7 +344,8 @@ function handleLegacy(data) {
             return;
         }
         if (data.code === 'instabilidade') {
-            document.getElementById('textoTimeout').innerText = "Desculpe! O sistema da escola está instável ou demorando muito para responder no momento. Por favor, tente novamente em alguns minutos!";
+            document.getElementById('tituloTimeout').innerText = "Sistema fora do ar";
+            document.getElementById('textoTimeout').innerText = "Desculpe! O sistema da escola está fora do ar no momento. Por favor, tente novamente mais tarde.";
             openModal('modalTimeout');
             return;
         }
@@ -356,6 +358,7 @@ function handleLegacy(data) {
         } else if (data.message && (data.message.toLowerCase().includes('encontr') || data.message.toLowerCase().includes('existe') || data.message.toLowerCase().includes('secretaria'))) {
             openModal('modalCpfNaoEncontrado');
         } else if (data.message && data.message.toLowerCase().includes('falha ao acessar')) {
+            document.getElementById('tituloTimeout').innerText = "Sistema Lento";
             document.getElementById('textoTimeout').innerText = `Desculpe, ${nome}! O sistema está com uma alta demanda ou demorando muito para responder no momento. Por favor, tente novamente!`;
             openModal('modalTimeout');
         } else {
@@ -409,6 +412,7 @@ function handleLegacy(data) {
     } else {
         // Fallback de segurança caso a API retorne algo inesperado ou Error in workflow
         if (data.message && data.message.includes('Error in workflow')) {
+            document.getElementById('tituloTimeout').innerText = "Sistema Lento";
             document.getElementById('textoTimeout').innerText = "Desculpe! O sistema está com uma alta demanda ou demorando muito para responder no momento. Por favor, tente novamente!";
             openModal('modalTimeout');
         } else {
