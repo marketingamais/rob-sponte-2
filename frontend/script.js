@@ -224,7 +224,7 @@ function registrarAcao(tipo, extra) {
     if (!consultaAtual.id) return;
     const corpo = JSON.stringify(Object.assign({ tipo, consulta_id: consultaAtual.id }, extra || {}));
     try { if (navigator.sendBeacon && navigator.sendBeacon(URL_EVENTO, corpo)) return; } catch (e) {}
-    try { fetch(URL_EVENTO, { method: 'POST', body: corpo, keepalive: true }); } catch (e) {}
+    try { fetch(URL_EVENTO, { method: 'POST', body: corpo, keepalive: true }).catch(() => {}); } catch (e) {}
 }
 
 // Primeiro + ultimo nome (ex.: "Maria Aparecida da Silva" -> "Maria Silva")
@@ -255,8 +255,10 @@ function boletoCardHTML(b, atrasada) {
     const info = atrasada
         ? `<p class="venc-atraso">Venceu em ${b.dataVencimento}${valor ? ' &bull; ' + valor : ''}</p>`
         : `<p class="venc-ok">Vence em ${b.dataVencimento}${valor ? ' &bull; ' + valor : ''}</p>`;
+    const modo = atrasada ? 'debito' : 'antecipacao';
+    const onclickPagar = (atrasada ? '' : "registrarAcao('clicou_antecipar'); ") + `showLinhaDigitavel('${b.linhaDigitavel}', '${b.numParcela}', '${b.dataVencimento}', '${b.valor || ''}', '${modo}')`;
     const acao = b.linhaDigitavel
-        ? `<button class="btn-whatsapp pill-shape btn-pagar" onclick="showLinhaDigitavel('${b.linhaDigitavel}', '${b.numParcela}', '${b.dataVencimento}', '${b.valor || ''}', 'debito')">Pagar</button>`
+        ? `<button class="btn-whatsapp pill-shape btn-pagar" onclick="${onclickPagar}">Pagar</button>`
         : `<span class="boleto-indisponivel">Boleto ainda não liberado</span>`;
     return `
         <div class="boleto-card ${atrasada ? '' : 'ok'}">
