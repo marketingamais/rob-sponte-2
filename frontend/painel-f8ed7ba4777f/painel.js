@@ -264,9 +264,16 @@
             const x = d.reducao_inadimplencia;
             campo('reducao_inadimplencia', 'valor').textContent = F.formatarPct(x.taxa);
             campo('reducao_inadimplencia', 'barra').style.width = (x.taxa === null || x.taxa === undefined ? 0 : Math.min(100, x.taxa * 100)) + '%';
-            campo('reducao_inadimplencia', 'apoio').textContent = x.baseDebito
-                ? `Recuperado ${F.formatarMoeda(x.recuperado)} de ${F.formatarMoeda(x.baseDebito)} em débito consultado`
-                : 'Sem débito consultado no período.';
+            const motivos = {
+                base_incompleta: 'Há consultas com débito sem valor registrado. A taxa aguarda uma base completa.',
+                pagamentos_sem_vinculo: 'Há pagamento de débito sem vínculo com a consulta original. A taxa aguarda a identificação dessa base.',
+                pagamento_fora_da_base: 'Há pagamento de débito pela data da cópia, mas nenhuma base de consultas correspondente neste período. Amplie o período.',
+                sem_debito: 'Sem débito consultado no período. Pagamentos antecipados não reduzem inadimplência.'
+            };
+            campo('reducao_inadimplencia', 'apoio').textContent = x.motivo && motivos[x.motivo] ? motivos[x.motivo]
+                : x.baseDebito ? `Recuperado ${F.formatarMoeda(x.recuperado)} de ${F.formatarMoeda(x.baseDebito)} em débito das consultas do período. Antecipações não entram.`
+                : x.recuperado > 0 ? 'Pagamento confirmado, mas sem base de débito disponível neste período. Amplie o período.'
+                : motivos.sem_debito;
         }
 
         // Tempo humano
@@ -289,7 +296,13 @@
             pil.title = 'Taxa de conversão';
             const v = a && a.base ? F.variacao(x.taxa, a.taxa, 'pontos') : null;
             const apoio = c.querySelector('[data-apoio]');
-            apoio.innerHTML = `de ${F.formatarNumero(x.base)} consultas`;
+            apoio.innerHTML = `de ${F.formatarNumero(x.base)} ${x.base === 1 ? 'consulta' : 'consultas'}`;
+            if (chave === 'funil_antecipar') {
+                apoio.innerHTML += Number.isFinite(x.copiaram)
+                    ? ` · ${F.formatarNumero(x.copiaram)} ${x.copiaram === 1 ? 'consulta copiou' : 'consultas copiaram'} a linha`
+                    : ' · cópias não disponíveis';
+                apoio.innerHTML += ' · pagamentos confirmados em Valor antecipado';
+            }
             if (v !== null) {
                 const t = tendencia(v, 'bom'), icone = v > 0 ? 'ti-arrow-up-right' : v < 0 ? 'ti-arrow-down-right' : 'ti-minus';
                 apoio.innerHTML += ` · <span class="tendencia${t ? ' tendencia-' + t : ''}"><i class="ti ${icone}" aria-hidden="true"></i>${F.formatarVariacao(v, 'pontos')}</span> vs período anterior`;
@@ -305,7 +318,7 @@
             c.querySelector('[data-valor]').textContent = F.formatarMoeda(x.valor);
             const v = a ? F.variacao(x.valor, a.valor) : null, pil = c.querySelector('[data-delta]');
             if (v === null) pil.hidden = true; else pintarPilula(pil, v, 'pct', 'bom');
-            c.querySelector('[data-apoio]').textContent = `${F.formatarNumero(x.qtdPagos)} ${x.qtdPagos === 1 ? 'boleto pago' : 'boletos pagos'} depois da cópia`;
+            c.querySelector('[data-apoio]').textContent = `${F.formatarNumero(x.qtdPagos)} ${x.qtdPagos === 1 ? 'boleto com pagamento confirmado' : 'boletos com pagamento confirmado'} · pela data da cópia`;
             const conf = c.querySelector('[data-conferencia]');
             conf.textContent = x.qtdEmConferencia ? `+ ${F.formatarMoeda(x.emConferencia)} em conferência (${F.formatarNumero(x.qtdEmConferencia)})` : 'Nada em conferência';
             conf.classList.toggle('vazia', !x.qtdEmConferencia);
