@@ -17,7 +17,7 @@
     <script src="formatos.js" defer></script>
     <script src="api.js" defer></script>
     <script src="graficos.js" defer></script>
-    <script src="painel.js" defer></script>
+    <script src="painel.js?v=20261008-erros1" defer></script>
 </head>
 <body>
 
@@ -164,6 +164,16 @@
 
                     <p id="dashboardErro" class="alerta" hidden></p>
                     <p id="dashboardVazio" class="aviso-vazio" hidden>Nenhum indicador liberado para você ainda. Fale com um super administrador.</p>
+
+                    <section id="pendenciasPlanilha" class="card-v2" style="margin-bottom:24px" hidden aria-labelledby="pendenciasTitulo">
+                        <header class="card-v2-cab"><div class="card-v2-titulos">
+                            <p class="rotulo">Planilha de erros</p>
+                            <h3 id="pendenciasTitulo" class="card-v2-titulo">Registros pendentes de gravação</h3>
+                        </div></header>
+                        <p id="pendenciasResumo" class="texto-apoio" role="status"></p>
+                        <details><summary>Ver registros e CPFs</summary><ul id="pendenciasLista" class="lista-metricas"></ul></details>
+                        <a href="https://n8n.amais.io/workflow/vQ3YTmcK3zPalgwY" target="_blank" rel="noopener">Abrir fluxo para reenviar pendências</a>
+                    </section>
 
                     <div id="grade" class="grade">
                         <!-- Linha 1: KPIs de volume -->

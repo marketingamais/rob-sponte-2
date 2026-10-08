@@ -17,6 +17,7 @@
 
     // ---------- Sessão / telas ----------
     function mostrarLogin(msg) {
+        $('pendenciasPlanilha').hidden = true; $('pendenciasLista').textContent = '';
         $('app').hidden = true; $('telaLogin').hidden = false;
         if (msg) { $('loginErro').textContent = msg; $('loginErro').hidden = false; }
     }
@@ -238,6 +239,23 @@
 
     function desenharDashboard(r, ant) {
         const d = r.dados || {}, permitidos = Array.isArray(r.kpis) ? r.kpis : [];
+        const registros = r.registrosPlanilha;
+        const mostrarPendencias = usuarioAtual && usuarioAtual.papel === 'super_admin' && registros && (!registros.ok || registros.pendentes > 0);
+        $('pendenciasPlanilha').hidden = !mostrarPendencias;
+        $('pendenciasLista').textContent = '';
+        if (mostrarPendencias) {
+            $('pendenciasResumo').textContent = registros.ok
+                ? `${registros.pendentes} registro(s) ainda não chegaram à planilha. Os dados estão preservados para reenvio. Esta lista considera todas as pendências, independentemente do período selecionado.`
+                : 'Não foi possível verificar as pendências de gravação. Atualize o painel para tentar novamente.';
+            $('pendenciasLista').innerHTML = (registros.registros || []).map(x => {
+                const url = 'https://n8n.amais.io/workflow/' + encodeURIComponent(x.workflow_id) + '/executions/' + encodeURIComponent(x.execution_id);
+                return `<li><i class="ti ti-alert-circle metrica-icone" aria-hidden="true"></i><div class="metrica-texto">
+                    <p class="metrica-rotulo">${esc(x.cpf)} · ${esc(x.tela)}</p>
+                    <p class="metrica-sub" style="white-space:normal">${esc(x.quando ? new Date(x.quando).toLocaleString('pt-BR', { timeZone: 'America/Sao_Paulo' }) : '')} · ${esc(x.motivo)}</p>
+                    <p class="metrica-sub" style="white-space:normal">${esc(x.detalhe)} · <a href="${esc(url)}" target="_blank" rel="noopener">Ver execução</a></p>
+                    </div><span></span><span></span></li>`;
+            }).join('');
+        }
         const p = r.periodo || periodo;
         $('periodoTexto').textContent = p.de === p.ate
             ? `Consultas de boletos em ${F.formatarDia(p.de)}.`

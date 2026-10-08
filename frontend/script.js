@@ -127,12 +127,12 @@ async function handleFormSubmit(e) {
     startLoadingAnimation();
     initGame();
     const inicioConsulta = Date.now();
+    let tentativas = 0;
 
     try {
         const webhookUrl = 'https://n8n.amais.io/webhook/buscar-boletos-novo';
 
         let data = null;
-        let tentativas = 0;
         const maxTentativas = 5;
 
         while (tentativas < maxTentativas) {
@@ -147,18 +147,21 @@ async function handleFormSubmit(e) {
                         body: JSON.stringify({ cpf, consulta_id: consultaAtual.id }),
                         signal: ctrl.signal
                     });
+                } catch (err) {
+                    if (err.name !== 'AbortError') err.tipoConsulta = 'rede';
+                    throw err;
                 } finally {
                     clearTimeout(timer);
                 }
 
                 // 5xx (n8n/robo fora do ar): tenta de novo
-                if (response.status >= 500) throw new Error('HTTP ' + response.status);
+                if (response.status >= 500) throw Object.assign(new Error('HTTP ' + response.status), { tipoConsulta: 'http', httpStatus: response.status });
 
                 const jsonData = await response.json();
 
                 // Verifica se o N8N retornou erro de timeout (Error in workflow)
                 if (jsonData.message && jsonData.message.includes('Error in workflow')) {
-                    throw new Error('N8N Timeout');
+                    throw Object.assign(new Error('Falha no fluxo'), { tipoConsulta: 'workflow' });
                 }
 
                 data = jsonData;
@@ -184,7 +187,9 @@ async function handleFormSubmit(e) {
         handleRobotResponse(data);
         
     } catch (error) {
-        registrarEventoErro('timeout_navegador', cpf, Date.now() - inicioConsulta);
+        const duracaoMs = Date.now() - inicioConsulta;
+        registrarEventoErro('timeout_navegador', cpf, duracaoMs,
+            detalheErroConsulta(error, Math.min(tentativas + 1, 5), duracaoMs));
         console.error('Erro após as tentativas:', error);
         stopLoadingAnimation();
         closeModal('modalLoading');
@@ -205,11 +210,18 @@ const WA_NEGOCIAR = 'https://wa.me/5508008860663?text=Gostaria%20de%20negociar%2
 
 // Registra no painel erros que so o navegador ve (CPF invalido, timeout, erro desconhecido)
 const URL_EVENTO = 'https://n8n.amais.io/webhook/registrar-evento-front';
-function registrarEventoErro(code, cpf, duracaoMs) {
+function detalheErroConsulta(error, tentativas, duracaoMs) {
+    const e = error || {};
+    const tipo = e.tipoConsulta || (e.name === 'AbortError' ? 'timeout' : e.name === 'SyntaxError' ? 'resposta_invalida' : 'cliente');
+    return { tipo, tentativas, duracao_ms: duracaoMs, ...(e.httpStatus ? { http_status: e.httpStatus } : {}) };
+}
+function registrarEventoErro(code, cpf, duracaoMs, detalhe) {
     try {
-        const corpo = JSON.stringify({ code, cpf: String(cpf || '').replace(/\D/g, '').slice(0, 11), duracao_ms: duracaoMs == null ? null : Math.round(duracaoMs) });
-        if (navigator.sendBeacon) navigator.sendBeacon(URL_EVENTO, corpo);
-        else fetch(URL_EVENTO, { method: 'POST', body: corpo, keepalive: true }).catch(() => {});
+        const corpo = JSON.stringify({ code, cpf: String(cpf || '').replace(/\D/g, '').slice(0, 11),
+            duracao_ms: duracaoMs == null ? null : Math.round(duracaoMs), detalhe,
+            consulta_id: code === 'cpf_invalido' ? '' : consultaAtual.id });
+        try { if (navigator.sendBeacon && navigator.sendBeacon(URL_EVENTO, corpo)) return; } catch (e) {}
+        fetch(URL_EVENTO, { method: 'POST', body: corpo, keepalive: true }).catch(() => {});
     } catch (e) { /* nunca atrapalha o site */ }
 }
 
