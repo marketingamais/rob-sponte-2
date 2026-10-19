@@ -3,6 +3,7 @@
     const $ = (id) => document.getElementById(id);
     const $$ = (sel) => document.querySelectorAll(sel);
     let usuarioAtual = null, periodo = null, carregamento = 0;
+    let dashboardEmCurso = false, pedidoPendente = null, timerDashboard = null;
     const hojeSP = () => new Date().toLocaleDateString('en-CA', { timeZone: 'America/Sao_Paulo' });
     const guardar = (k, v) => { try { localStorage.setItem(k, v); } catch (e) {} };
     const ler = (k) => { try { return localStorage.getItem(k); } catch (e) { return null; } };
@@ -17,6 +18,9 @@
 
     // ---------- Sessão / telas ----------
     function mostrarLogin(msg) {
+        usuarioAtual = null; carregamento++; pedidoPendente = null;
+        clearTimeout(timerDashboard);
+        $('grade').classList.remove('carregando'); $('comparacaoStatus').hidden = true;
         $('pendenciasPlanilha').hidden = true; $('pendenciasLista').textContent = '';
         $('app').hidden = true; $('telaLogin').hidden = false;
         if (msg) { $('loginErro').textContent = msg; $('loginErro').hidden = false; }
@@ -154,7 +158,7 @@
         const pil = c.querySelector('[data-delta]'), pe = c.querySelector('[data-pe]');
         if (v === null) {
             pil.hidden = true; c.dataset.tendencia = '';
-            pe.textContent = anterior ? `${F.formatarNumero(anterior.valor)} no período anterior` : 'sem período anterior para comparar';
+            pe.textContent = anterior ? `${F.formatarNumero(anterior.valor)} no período anterior` : 'sem comparação com o período anterior';
             return;
         }
         c.dataset.tendencia = pintarPilula(pil, v, 'pct', c.dataset.sentido);
@@ -218,23 +222,53 @@
             <span class="metrica-valor">${valor}</span>${direita}</li>`;
     }
 
-    async function carregarDashboard() {
+    function carregarDashboard() {
+        if (!usuarioAtual) return;
         if (!periodo) definirPeriodo(F.periodoPreset('7d', hojeSP()));
-        const meu = ++carregamento;
+        const pedido = { geracao: ++carregamento, periodo: { de: periodo.de, ate: periodo.ate }, pronto: false };
+        pedidoPendente = pedido;
+        clearTimeout(timerDashboard);
         $('dashboardErro').hidden = true;
+        $('comparacaoStatus').hidden = true;
         esqueleto();
-        const [atual, anterior] = await Promise.allSettled([
-            API.chamar('dashboard', periodo),
-            API.chamar('dashboard', F.periodoAnterior(periodo))
-        ]);
-        if (meu !== carregamento) return; // outro carregamento começou depois
-        $('grade').classList.remove('carregando');
-        if (atual.status !== 'fulfilled') {
-            $('dashboardErro').textContent = atual.reason.message; $('dashboardErro').hidden = false;
+        timerDashboard = setTimeout(() => {
+            if (pedidoPendente !== pedido) return;
+            pedido.pronto = true; executarDashboard();
+        }, 200);
+    }
+
+    async function executarDashboard() {
+        if (dashboardEmCurso || !pedidoPendente || !pedidoPendente.pronto) return;
+        const pedido = pedidoPendente;
+        pedidoPendente = null; dashboardEmCurso = true;
+        const vigente = () => pedido.geracao === carregamento && usuarioAtual;
+        try {
+            const atual = await API.chamar('dashboard', pedido.periodo);
+            if (!vigente()) return;
+            $('grade').classList.remove('carregando');
+            desenharDashboard(atual, null);
+            $('comparacaoStatus').textContent = 'Comparando com o período anterior…';
+            $('comparacaoStatus').hidden = false;
+            try {
+                const anterior = await API.chamar('dashboard', F.periodoAnterior(pedido.periodo));
+                if (!vigente()) return;
+                desenharDashboard(atual, anterior.dados || null);
+                $('comparacaoStatus').hidden = true;
+            } catch (err) {
+                if (!vigente()) return;
+                $('comparacaoStatus').textContent = 'Comparação com o período anterior indisponível. Os dados atuais foram carregados.';
+                $('comparacaoStatus').hidden = false;
+            }
+        } catch (err) {
+            if (!vigente()) return;
+            $('grade').classList.remove('carregando');
+            $('dashboardErro').textContent = err.message; $('dashboardErro').hidden = false;
             $$('#grade [data-valor]').forEach(e => { e.textContent = '—'; });
-            return;
+        } finally {
+            dashboardEmCurso = false;
+            // Uma única seleção pendente substitui as anteriores; nenhuma chamada é abortada e duplicada.
+            executarDashboard();
         }
-        desenharDashboard(atual.value, anterior.status === 'fulfilled' ? (anterior.value.dados || null) : null);
     }
 
     function desenharDashboard(r, ant) {
@@ -538,6 +572,7 @@
         const s = API.lerSessao();
         if (!s || !s.access_token) return mostrarLogin();
         API.agendarRefresh(s);
-        try { const r = await API.chamar('eu'); catalogo = r.catalogo || null; mostrarApp(r.usuario); } catch (e) { mostrarLogin(); }
+        try { const r = await API.chamar('eu'); catalogo = r.catalogo || null; mostrarApp(r.usuario); }
+        catch (e) { if (!e.sessaoAlterada) mostrarLogin(); }
     })();
 })();
