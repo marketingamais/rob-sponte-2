@@ -357,9 +357,10 @@ function handleRobotResponse(data) {
         return handleLegacy({ status: 'erro', code: 'instabilidade' });
     }
 
-    if (data && data.status !== 'erro' && Array.isArray(data.alunos) && data.alunos.length > 0) {
+    if (data && Array.isArray(data.alunos) && data.alunos.length > 0) {
         const nomeResp = formatNome(data.nomeResponsavel || data.nomeFormatado || 'Aluno') || 'Aluno';
         renderAlunosScreen(nomeResp, data.alunos);
+        if (data.parcial) document.getElementById('boletosList').insertAdjacentHTML('afterbegin', '<p class="aluno-msg" role="alert">Não foi possível confirmar toda a consulta. Confira os avisos de cada aluno e tente novamente para consultar todos os cadastros.</p>');
         return;
     }
 
