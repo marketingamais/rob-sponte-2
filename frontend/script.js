@@ -262,20 +262,25 @@ function formatValor(v) {
 }
 
 // Card de um boleto (atrasada = vencido em vermelho)
+function escapeHTML(texto) {
+    return String(texto || '').replace(/[&<>"']/g, c => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' }[c]));
+}
+
 function boletoCardHTML(b, atrasada) {
     const valor = formatValor(b.valor);
     const info = atrasada
-        ? `<p class="venc-atraso">Venceu em ${b.dataVencimento}${valor ? ' &bull; ' + valor : ''}</p>`
-        : `<p class="venc-ok">Vence em ${b.dataVencimento}${valor ? ' &bull; ' + valor : ''}</p>`;
+        ? `<p class="venc-atraso">Venceu em ${escapeHTML(b.dataVencimento)}${valor ? ' &bull; ' + valor : ''}</p>`
+        : `<p class="venc-ok">Vence em ${escapeHTML(b.dataVencimento)}${valor ? ' &bull; ' + valor : ''}</p>`;
     const modo = atrasada ? 'debito' : 'antecipacao';
-    const onclickPagar = (atrasada ? '' : "registrarAcao('clicou_antecipar'); ") + `showLinhaDigitavel('${b.linhaDigitavel}', '${b.numParcela}', '${b.dataVencimento}', '${b.valor || ''}', '${modo}')`;
+    const argumentos = [b.linhaDigitavel, b.numParcela, b.dataVencimento, b.valor || '', modo].map(v => JSON.stringify(String(v || ''))).join(', ');
+    const onclickPagar = (atrasada ? '' : "registrarAcao('clicou_antecipar'); ") + `showLinhaDigitavel(${argumentos})`;
     const acao = b.linhaDigitavel
-        ? `<button class="btn-whatsapp pill-shape btn-pagar" onclick="${onclickPagar}">Pagar</button>`
+        ? `<button class="btn-whatsapp pill-shape btn-pagar" onclick="${escapeHTML(onclickPagar)}">${atrasada ? 'Pagar' : 'Antecipar próxima parcela'}</button>`
         : `<span class="boleto-indisponivel">Boleto ainda não liberado</span>`;
     return `
         <div class="boleto-card ${atrasada ? '' : 'ok'}">
             <div class="boleto-info">
-                <h4>Parcela ${b.numParcela}</h4>
+                <h4>Parcela ${escapeHTML(b.numParcela)}</h4>
                 ${info}
             </div>
             ${acao}
@@ -290,7 +295,7 @@ function renderAlunosScreen(nomeResp, alunos) {
     let sub;
     if (alunos.length === 1) {
         const a0 = alunos[0];
-        const nomeA = formatNome(a0.nomeAluno) || 'seu aluno';
+        const nomeA = escapeHTML(a0.nomeAluno) || 'seu aluno';
         const temBoletos = a0.boletos && a0.boletos.length > 0;
         sub = (a0.status !== 'negociar' && temBoletos)
             ? `Temos esses boletos para <strong>${nomeA}</strong> disponíveis:`
@@ -298,11 +303,11 @@ function renderAlunosScreen(nomeResp, alunos) {
     } else {
         sub = 'Veja os boletos disponíveis por aluno:';
     }
-    titulo.innerHTML = `Olá, <strong>${nomeResp}</strong>!<span class="screen-subtitle">${sub}</span>`;
+    titulo.innerHTML = `Olá, <strong>${escapeHTML(nomeResp)}</strong>!<span class="screen-subtitle">${sub}</span>`;
 
     let html = '';
     for (const a of alunos) {
-        const nomeA = formatNome(a.nomeAluno) || 'Aluno';
+        const nomeA = escapeHTML(a.nomeAluno) || 'Aluno';
         let badgeClass, badgeLabel, corpo;
 
         if (a.status === 'negociar') {
@@ -317,12 +322,18 @@ function renderAlunosScreen(nomeResp, alunos) {
         } else if (a.status === 'pagar_atrasados') {
             badgeClass = 'vencido'; badgeLabel = 'Vencido';
             const cards = (a.boletos || []).map(b => boletoCardHTML(b, true)).join('');
-            corpo = cards || `<p class="aluno-msg">Nenhum boleto disponível no momento.</p>`;
-        } else {
+            corpo = `<p class="aluno-msg">Identificamos uma parcela em atraso do(a) <strong>${nomeA}</strong></p>`
+                + (cards || `<p class="aluno-msg">O boleto ainda não foi liberado pela escola.</p>`);
+        } else if (a.status === 'em_dia') {
             badgeClass = 'emdia'; badgeLabel = 'Em dia';
-            corpo = (a.boletos && a.boletos.length > 0)
-                ? `<p class="aluno-msg">Em dia! Sua próxima parcela:</p>` + a.boletos.map(b => boletoCardHTML(b, false)).join('')
-                : `<p class="aluno-msg">Você está em dia e não há parcelas liberadas no momento.</p>`;
+            const pedido = 'Olá! Gostaria de antecipar a próxima parcela do(a) ' + (a.nomeAluno || 'aluno') + '.';
+            const solicitar = `<p class="aluno-msg">A próxima parcela ainda não foi liberada para pagamento.</p><a href="https://wa.me/5599981095341?text=${encodeURIComponent(pedido)}" target="_blank" rel="noopener" class="btn-whatsapp pill-shape" onclick="registrarAcao('clicou_antecipar')">Solicitar antecipação da próxima parcela</a>`;
+            corpo = `<p class="aluno-msg">Não encontramos nenhuma parcela em atraso do(a) <strong>${nomeA}</strong>. Parabéns!</p>`
+                + (a.boletos || []).map(b => boletoCardHTML(b, false)).join('')
+                + ((a.boletos || []).some(b => b.linhaDigitavel) ? '' : solicitar);
+        } else {
+            badgeClass = 'negociar'; badgeLabel = 'A confirmar';
+            corpo = `<p class="aluno-msg">Não foi possível confirmar a situação do(a) <strong>${nomeA}</strong>. Tente novamente ou fale com a escola.</p>`;
         }
 
         html += `
@@ -340,6 +351,11 @@ function renderAlunosScreen(nomeResp, alunos) {
 
 function handleRobotResponse(data) {
     console.log('Resposta N8N:', data);
+
+    if (data && data.status !== 'erro' && Array.isArray(data.alunos) && data.alunos.length === 0) {
+        registrarEventoErro('desconhecido', consultaAtual.cpf, null, { tipo: 'resposta_invalida' });
+        return handleLegacy({ status: 'erro', code: 'instabilidade' });
+    }
 
     if (data && data.status !== 'erro' && Array.isArray(data.alunos) && data.alunos.length > 0) {
         const nomeResp = formatNome(data.nomeResponsavel || data.nomeFormatado || 'Aluno') || 'Aluno';
@@ -456,30 +472,7 @@ function handleLegacy(data) {
 }
 
 function renderBoletosList(parcelas) {
-    const listContainer = document.getElementById('boletosList');
-    listContainer.innerHTML = '';
-    
-    parcelas.forEach(p => {
-        const card = document.createElement('div');
-        card.className = 'boleto-card';
-        
-        card.innerHTML = `
-            <div class="boleto-info">
-                <h4>Parcela ${p.numParcela}</h4>
-                <p>Venceu em: ${p.dataVencimento}</p>
-            </div>
-            ${p.linhaDigitavel ? `
-            <button class="btn-whatsapp pill-shape" style="padding: 0.75rem 1.5rem; font-size: 0.875rem;" onclick="showLinhaDigitavel('${p.linhaDigitavel}', '${p.numParcela}', '${p.dataVencimento}', '${p.valor || ''}', 'debito')">
-                Pagar
-            </button>
-            ` : `
-            <span style="font-size: 0.8rem; color: var(--error); padding: 0.5rem; background: #fff0f0; border-radius: 8px;">
-                Boleto indisponível
-            </span>
-            `}
-        `;
-        listContainer.appendChild(card);
-    });
+    document.getElementById('boletosList').innerHTML = (parcelas || []).map(p => boletoCardHTML(p, true)).join('');
 }
 
 // Funções de Modais
